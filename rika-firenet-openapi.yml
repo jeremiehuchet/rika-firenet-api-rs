@@ -1,0 +1,538 @@
+openapi: 3.0.3
+info:
+  title: Rika Firenet - OpenAPI 3.0
+  description: |-
+    This is an OpenAPI descriptor for the Rika Firenet API.
+  version: 1.0.0
+servers:
+  - url: https://www.rika-firenet.com
+tags:
+  - name: stove
+    description: Manage your stoves
+paths:
+  /web/login:
+    post:
+      tags:
+        - stove
+      summary: Login to Rika Firenet API
+      operationId: login
+      requestBody:
+        description: User credentials
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  required: true
+                  description: Rika Firenet account email
+                password:
+                  type: string
+                  required: true
+                  description: Rika Firenet password
+      responses:
+        '302':
+          description: Successful login
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: The session cookie "connect.sid"
+  /api/client/{stoveId}/status:
+    get:
+      tags:
+        - stove
+      summary: Get stove status
+      operationId: stoveStatus
+      parameters:
+        - in: cookie
+          name: connect.sid
+          schema:
+            type: string
+            required: true
+        - in: path
+          name: stoveId
+          description: Stove identifier
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stove status
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                required: true
+              description: The session cookie "connect.sid" with extended lifetime
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoveStatus'
+  /api/client/{stoveId}/controls:
+    post:
+      tags:
+        - stove
+      summary: Set stove parameters
+      operationId: stoveContols
+      parameters:
+        - in: cookie
+          name: connect.sid
+          schema:
+            type: string
+            required: true
+        - in: path
+          name: stoveId
+          description: Stove identifier
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Stove parameters
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StoveControls'
+      responses:
+        '200':
+          description: Parameters successfuly updated
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: The session cookie "connect.sid" with extended lifetime
+        '404':
+          description: Stove update failed
+          content:
+            text/html:
+              schema:
+                type: string
+              example: Revision 1677289508 is outdated!
+  /web/logout:
+    get:
+      tags:
+        - stove
+      summary: Logout from Rika Firenet API
+      operationId: logout
+      parameters:
+        - in: cookie
+          name: connect.sid
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Successful logout
+components:
+  schemas:
+    StoveStatus:
+      type: object
+      properties:
+        stoveID:
+          type: string
+          description: Stove identifier
+          example: 342556
+        name:
+          type: string
+          description: Stove name
+        oem:
+          type: string
+          description: Manufacturer
+          example: Rika
+        stoveType:
+          type: string
+          description: Model name
+          example: DOMO
+        lastConfirmedRevision:
+          type: integer
+          example: 1677701212255
+        lastSeenMinutes:
+          type: integer
+          example: 0
+        controls:
+          $ref: '#/components/schemas/StoveControls'
+        sensors:
+          $ref: '#/components/schemas/StoveSensors'
+        stoveFeatures:
+          $ref: '#/components/schemas/StoveFeatures'
+      required:
+        - stoveID
+        - name
+        - oem
+        - lastConfirmedRevision
+        - lastSeenMinutes
+        - stoveType
+        - controls
+        - sensors
+        - stoveFeatures
+    StoveControls:
+      type: object
+      properties:
+        RoomPowerRequest:
+          type: integer
+        bakeTemperature:
+          type: string
+        convectionFan1Active:
+          type: boolean
+        convectionFan1Area:
+          type: integer
+        convectionFan1Level:
+          type: integer
+        convectionFan2Active:
+          type: boolean
+        convectionFan2Area:
+          type: integer
+        convectionFan2Level:
+          type: integer
+        debug0:
+          type: integer
+        debug1:
+          type: integer
+        debug2:
+          type: integer
+        debug3:
+          type: integer
+        debug4:
+          type: integer
+        ecoMode:
+          type: boolean
+        frostProtectionActive:
+          type: boolean
+        frostProtectionTemperature:
+          type: string
+        heatingPower:
+          type: integer
+        heatingTimeFri1:
+          type: string
+        heatingTimeFri2:
+          type: string
+        heatingTimeMon1:
+          type: string
+        heatingTimeMon2:
+          type: string
+        heatingTimeSat1:
+          type: string
+        heatingTimeSat2:
+          type: string
+        heatingTimeSun1:
+          type: string
+        heatingTimeSun2:
+          type: string
+        heatingTimeThu1:
+          type: string
+        heatingTimeThu2:
+          type: string
+        heatingTimeTue1:
+          type: string
+        heatingTimeTue2:
+          type: string
+        heatingTimeWed1:
+          type: string
+        heatingTimeWed2:
+          type: string
+        heatingTimesActiveForComfort:
+          type: boolean
+        onOff:
+          type: boolean
+        operatingMode:
+          type: integer
+        revision:
+          type: integer
+        setBackTemperature:
+          type: string
+        targetTemperature:
+          type: string
+        temperatureOffset:
+          type: string
+    StoveSensors:
+      type: object
+      properties:
+        inputBakeTemperature:
+          type: string
+        inputBoardTemperature:
+          type: string
+        inputBurnBackFlapSwitch:
+          type: boolean
+        inputCover:
+          type: boolean
+        inputCurrentStage:
+          type: integer
+        inputCurrentStagePID:
+          type: integer
+        inputDoor:
+          type: boolean
+        inputExternalRequest:
+          type: boolean
+        inputFlameTemperature:
+          type: integer
+        inputFlueGasFlapSwitch:
+          type: boolean
+        inputGridContact:
+          type: boolean
+        inputPressureSensor:
+          type: integer
+        inputPressureSwitch:
+          type: boolean
+        inputRoomTemperature:
+          type: string
+        inputTargetStagePID:
+          type: integer
+        inputUpperTemperatureLimiter:
+          type: boolean
+        outputAirFlaps:
+          type: integer
+        outputAirFlapsTargetPosition:
+          type: integer
+        outputBurnBackFlapMagnet:
+          type: boolean
+        outputDischargeCurrent:
+          type: integer
+        outputDischargeMotor:
+          type: integer
+        outputGridMotor:
+          type: boolean
+        outputIDFan:
+          type: integer
+        outputIDFanTarget:
+          type: integer
+        outputIgnition:
+          type: boolean
+        outputInsertionCurrent:
+          type: integer
+        outputInsertionMotor:
+          type: integer
+        parameterCleanIntervalBig:
+          type: integer
+        parameterDebug0:
+          type: integer
+        parameterDebug1:
+          type: integer
+        parameterDebug2:
+          type: integer
+        parameterDebug3:
+          type: integer
+        parameterDebug4:
+          type: integer
+        parameterEcoModePossible:
+          type: boolean
+        parameterErrorCount0:
+          type: integer
+        parameterErrorCount1:
+          type: integer
+        parameterErrorCount10:
+          type: integer
+        parameterErrorCount11:
+          type: integer
+        parameterErrorCount12:
+          type: integer
+        parameterErrorCount13:
+          type: integer
+        parameterErrorCount14:
+          type: integer
+        parameterErrorCount15:
+          type: integer
+        parameterErrorCount16:
+          type: integer
+        parameterErrorCount17:
+          type: integer
+        parameterErrorCount18:
+          type: integer
+        parameterErrorCount19:
+          type: integer
+        parameterErrorCount2:
+          type: integer
+        parameterErrorCount3:
+          type: integer
+        parameterErrorCount4:
+          type: integer
+        parameterErrorCount5:
+          type: integer
+        parameterErrorCount6:
+          type: integer
+        parameterErrorCount7:
+          type: integer
+        parameterErrorCount8:
+          type: integer
+        parameterErrorCount9:
+          type: integer
+        parameterFabricationNumber:
+          type: integer
+        parameterFeedRateService:
+          type: integer
+        parameterFeedRateTotal:
+          type: integer
+        parameterFlameSensorOffset:
+          type: integer
+        parameterIDFanTuning:
+          type: integer
+        parameterIgnitionCount:
+          type: integer
+        parameterKgTillCleaning:
+          type: integer
+        parameterLanguageNumber:
+          type: integer
+        parameterOnOffCycleCount:
+          type: integer
+        parameterPressureSensorOffset:
+          type: integer
+        parameterRuntimeLogs:
+          type: integer
+        parameterRuntimePellets:
+          type: integer
+        parameterServiceCountdownKg:
+          type: integer
+        parameterServiceCountdownTime:
+          type: integer
+        parameterSpiralMotorsTuning:
+          type: integer
+        parameterStoveTypeNumber:
+          type: integer
+        parameterVersionMainBoard:
+          type: integer
+        parameterVersionMainBoardBootLoader:
+          type: integer
+        parameterVersionMainBoardSub:
+          type: integer
+        parameterVersionTFT:
+          type: integer
+        parameterVersionTFTBootLoader:
+          type: integer
+        parameterVersionTFTSub:
+          type: integer
+        parameterVersionWiFi:
+          type: integer
+        parameterVersionWiFiBootLoader:
+          type: integer
+        parameterVersionWiFiSub:
+          type: integer
+        statusError:
+          type: integer
+        statusFrostStarted:
+          type: boolean
+        statusHeatingTimesNotProgrammed:
+          type: boolean
+        statusMainState:
+          type: integer
+        statusService:
+          type: integer
+        statusSubError:
+          type: integer
+        statusSubState:
+          type: integer
+        statusWarning:
+          type: integer
+        statusWifiStrength:
+          type: integer
+      required:
+        - inputBakeTemperature
+        - inputBoardTemperature
+        - inputBurnBackFlapSwitch
+        - inputCover
+        - inputCurrentStage
+        - inputCurrentStagePID
+        - inputDoor
+        - inputExternalRequest
+        - inputFlameTemperature
+        - inputFlueGasFlapSwitch
+        - inputGridContact
+        - inputPressureSensor
+        - inputPressureSwitch
+        - inputRoomTemperature
+        - inputTargetStagePID
+        - inputUpperTemperatureLimiter
+        - outputAirFlaps
+        - outputAirFlapsTargetPosition
+        - outputBurnBackFlapMagnet
+        - outputDischargeCurrent
+        - outputDischargeMotor
+        - outputGridMotor
+        - outputIDFan
+        - outputIDFanTarget
+        - outputIgnition
+        - outputInsertionCurrent
+        - outputInsertionMotor
+        - parameterCleanIntervalBig
+        - parameterDebug0
+        - parameterDebug1
+        - parameterDebug2
+        - parameterDebug3
+        - parameterDebug4
+        - parameterEcoModePossible
+        - parameterErrorCount0
+        - parameterErrorCount1
+        - parameterErrorCount10
+        - parameterErrorCount11
+        - parameterErrorCount12
+        - parameterErrorCount13
+        - parameterErrorCount14
+        - parameterErrorCount15
+        - parameterErrorCount16
+        - parameterErrorCount17
+        - parameterErrorCount18
+        - parameterErrorCount19
+        - parameterErrorCount2
+        - parameterErrorCount3
+        - parameterErrorCount4
+        - parameterErrorCount5
+        - parameterErrorCount6
+        - parameterErrorCount7
+        - parameterErrorCount8
+        - parameterErrorCount9
+        - parameterFabricationNumber
+        - parameterFeedRateService
+        - parameterFeedRateTotal
+        - parameterFlameSensorOffset
+        - parameterIDFanTuning
+        - parameterIgnitionCount
+        - parameterKgTillCleaning
+        - parameterLanguageNumber
+        - parameterOnOffCycleCount
+        - parameterPressureSensorOffset
+        - parameterRuntimeLogs
+        - parameterRuntimePellets
+        - parameterServiceCountdownKg
+        - parameterServiceCountdownTime
+        - parameterSpiralMotorsTuning
+        - parameterStoveTypeNumber
+        - parameterVersionMainBoard
+        - parameterVersionMainBoardBootLoader
+        - parameterVersionMainBoardSub
+        - parameterVersionTFT
+        - parameterVersionTFTBootLoader
+        - parameterVersionTFTSub
+        - parameterVersionWiFi
+        - parameterVersionWiFiBootLoader
+        - parameterVersionWiFiSub
+        - statusError
+        - statusFrostStarted
+        - statusHeatingTimesNotProgrammed
+        - statusMainState
+        - statusService
+        - statusSubError
+        - statusSubState
+        - statusWarning
+        - statusWifiStrength
+    StoveFeatures:
+      type: object
+      properties:
+        airFlaps:
+          type: boolean
+        bakeMode:
+          type: boolean
+        insertionMotor:
+          type: boolean
+        logRuntime:
+          type: boolean
+        multiAir1:
+          type: boolean
+        multiAir2:
+          type: boolean
+      required:
+        - airFlaps
+        - bakeMode
+        - insertionMotor
+        - logRuntime
+        - multiAir1
+        - multiAir2
