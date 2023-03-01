@@ -26,12 +26,13 @@ paths:
               properties:
                 email:
                   type: string
-                  required: true
                   description: Rika Firenet account email
                 password:
                   type: string
-                  required: true
                   description: Rika Firenet password
+              required:
+                - email
+                - password
       responses:
         '302':
           description: Successful login
@@ -49,9 +50,10 @@ paths:
       parameters:
         - in: cookie
           name: connect.sid
+          description: Session cookie
+          required: true
           schema:
             type: string
-            required: true
         - in: path
           name: stoveId
           description: Stove identifier
@@ -62,11 +64,11 @@ paths:
         '200':
           description: Stove status
           headers:
-            Set-Cookie:
+            Cookie:
+              required: true
+              description: The session cookie "connect.sid" with extended lifetime
               schema:
                 type: string
-                required: true
-              description: The session cookie "connect.sid" with extended lifetime
           content:
             application/json:
               schema:
@@ -80,9 +82,10 @@ paths:
       parameters:
         - in: cookie
           name: connect.sid
+          description: Session cookie
+          required: true
           schema:
             type: string
-            required: true
         - in: path
           name: stoveId
           description: Stove identifier
@@ -120,6 +123,8 @@ paths:
       parameters:
         - in: cookie
           name: connect.sid
+          description: Session cookie
+          required: true
           schema:
             type: string
       responses:
