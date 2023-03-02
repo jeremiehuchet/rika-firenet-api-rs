@@ -1,0 +1,156 @@
+<html xmlns="fakens" lang="fr" dir="ltr" class="ui-mobile">
+
+<head>
+    <base href="https://www.rika-firenet.com/web/summary">
+    <title>RIKA firenet
+    </title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Source+Sans+Pro:300,200">
+    <link rel="stylesheet" href="/assets/rika-firenet.css?version=7">
+    <script async="" src="//www.google-analytics.com/analytics.js"></script>
+    <script src="/assets/rika-firenet-fr.js?version=4"></script>
+    <link rel="shortcut icon" href="/images/favicon/favicon.ico">
+    <link rel="icon" sizes="16x16 32x32 64x64" href="/images/favicon/favicon.ico">
+    <link rel="icon" type="image/png" sizes="196x196" href="/images/favicon/favicon-192.png">
+    <link rel="icon" type="image/png" sizes="160x160" href="/images/favicon/favicon-160.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="/images/favicon/favicon-96.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="/images/favicon/favicon-64.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon/favicon-16.png">
+    <link rel="apple-touch-icon" href="/images/favicon/favicon-57.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/images/favicon/favicon-114.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/images/favicon/favicon-72.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/images/favicon/favicon-144.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="/images/favicon/favicon-60.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/images/favicon/favicon-120.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="/images/favicon/favicon-76.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/images/favicon/favicon-152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/favicon/favicon-180.png">
+    <meta name="msapplication-TileColor" content="#FFFFFF">
+    <meta name="msapplication-TileImage" content="/images/favicon/favicon-144.png">
+    <meta name="msapplication-config" content="/images/favicon/browserconfig.xml">
+</head>
+
+<body id="rika-body" class="ui-mobile-viewport ui-overlay-a">
+    <div data-role="page" data-url="/web/summary" tabindex="0"
+        class="ui-page ui-page-theme-a ui-page-header-fixed ui-page-active"
+        style="padding-top: 49px; min-height: 553px;">
+        <div id="cookieMessage">
+            <div>Ce site utilise des cookies. En poursuivant votre navigation sur ce site, vous acceptez l'utilisation
+                de cookies. Pour en savoir plus, lisez notre
+                <a href="/web/privacy" target="_blank" class="ui-link">
+                    cookie policy </a>.
+            </div>
+            <button id="acceptCookies" data-icon="fa-check" data-iconpos="notext" data-mini="true" data-inline="true"
+                class=" ui-btn ui-icon-fa-check ui-btn-icon-notext ui-btn-inline ui-shadow ui-corner-all ui-mini"></button>
+        </div>
+        <div id="sidePanel" data-role="panel" data-display="overlay" data-position="right" data-position-fixed="true"
+            data-theme="a"
+            class="ui-panel ui-panel-position-right ui-panel-display-overlay ui-panel-closed ui-body-a ui-panel-fixed ui-panel-animate">
+            <div class="ui-panel-inner">
+                <a id="sidePanelCloseButton" href="#sidePanel" class="ui-link"></a>
+                <div data-role="controlgroup" class="ui-controlgroup ui-controlgroup-vertical ui-corner-all">
+                    <div class="ui-controlgroup-controls ">
+                        <h3>Réglages
+                        </h3>
+                        <ul id="sidePanelButtons" data-role="listview" data-inset="true" data-theme="a"
+                            class="ui-listview ui-listview-inset ui-corner-all ui-shadow ui-group-theme-a">
+                            <li class="ui-first-child">
+                                <a href="/web/summary" data-theme="a" data-role="button" data-icon="fa-th-list"
+                                    data-iconpos="left"
+                                    class="sidePanelButton ui-link ui-btn ui-btn-a ui-icon-fa-th-list ui-btn-icon-left ui-shadow ui-corner-all ui-first-child"
+                                    role="button">Aperçu</a>
+                            </li>
+                            <li>
+                                <a href="/web/add" data-theme="a" data-role="button" data-icon="fa-plus"
+                                    data-iconpos="left"
+                                    class="sidePanelButton ui-link ui-btn ui-btn-a ui-icon-fa-plus ui-btn-icon-left ui-shadow ui-corner-all"
+                                    role="button">Ajouter un poêle</a>
+                            </li>
+                            <li>
+                                <a href="/web/profile" data-theme="a" data-role="button" data-icon="fa-user"
+                                    data-iconpos="left"
+                                    class="sidePanelButton ui-link ui-btn ui-btn-a ui-icon-fa-user ui-btn-icon-left ui-shadow ui-corner-all"
+                                    role="button">Gérer le compte</a>
+                            </li>
+                            <li>
+                                <a href="/web/password" data-theme="a" data-role="button" data-icon="fa-lock"
+                                    data-iconpos="left"
+                                    class="sidePanelButton ui-link ui-btn ui-btn-a ui-icon-fa-lock ui-btn-icon-left ui-shadow ui-corner-all"
+                                    role="button">Modifier le mot de passe</a>
+                            </li>
+                            <li>
+                                <a href="/web/about" data-theme="a" data-role="button" data-icon="fa-question-circle"
+                                    data-iconpos="left"
+                                    class="sidePanelButton ui-link ui-btn ui-btn-a ui-icon-fa-question-circle ui-btn-icon-left ui-shadow ui-corner-all"
+                                    role="button">Mentions légales</a>
+                            </li>
+                            <li class="ui-last-child">
+                                <a href="/web/logout" data-theme="a" data-role="button" data-icon="fa-sign-out"
+                                    data-iconpos="left"
+                                    class="sidePanelButton ui-link ui-btn ui-btn-a ui-icon-fa-sign-out ui-btn-icon-left ui-shadow ui-corner-all ui-last-child"
+                                    role="button">Se déconnecter</a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="rika-header" data-role="header" data-position="fixed" data-tap-toggle="false" role="banner"
+            class="ui-header ui-bar-inherit ui-header-fixed slidedown">
+            <div class="rika-header-wrapper">
+                <a href="/web/" style="float:left" class="ui-link"><img src="/images/RIKA-flame.svg"
+                        style="height:2.8em; padding: 0.1em;"></a>
+                <a id="sidePanelButton" href="#sidePanel" class="ui-link"></a>
+                <div class="rika-title">
+                    <span style="line-height: 1em">Bienvenue </span>
+                    <span style="line-height: 1em" class="hide-medium">à RIKA firenet </span>
+                    <span style="line-height: 1em"><br>someone@rike-firenet.com</span>
+                </div>
+            </div>
+        </div>
+        <div role="main" class="ui-content">
+            <div data-role="controlgroup" class="ui-controlgroup ui-controlgroup-vertical ui-corner-all">
+                <div class="ui-controlgroup-controls ">
+                    <h3>Vous avez accès aux poêles suivants :
+                    </h3>
+                    <ul id="stoveList" data-role="listview" data-inset="true" data-theme="a" data-split-theme="a"
+                        data-split-icon="fa-pencil"
+                        class="ui-listview ui-listview-inset ui-corner-all ui-shadow ui-group-theme-a">
+                        <li class="ui-li-has-alt ui-first-child">
+                            <a href="/web/stove/12345" data-ajax="false" class="ui-btn ui-first-child">Stove n1</a>
+                            <a href="/web/edit/12345" data-ajax="false"
+                                class="ui-btn ui-btn-icon-notext ui-icon-fa-pencil ui-btn-a ui-last-child" title=""></a>
+                        </li>
+                        <li class="ui-li-has-alt ui-last-child">
+                            <a href="/web/stove/333444" data-ajax="false" class="ui-btn ui-first-child">Stove n2</a>
+                            <a href="/web/edit/333444" data-ajax="false"
+                                class="ui-btn ui-btn-icon-notext ui-icon-fa-pencil ui-btn-a ui-last-child" title=""></a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div id="gadiv">
+            <script>(function (i, s, o, g, r, a, m) {
+                    i['GoogleAnalyticsObject'] = r; i[r] = i[r] || function () {
+                        (i[r].q = i[r].q || []).push(arguments)
+                    }, i[r].l = 1 * new Date(); a = s.createElement(o),
+                        m = s.getElementsByTagName(o)[0]; a.async = 1; a.src = g; m.parentNode.insertBefore(a, m)
+                })(window, document, 'script', '//www.google-analytics.com/analytics.js', 'ga');
+                ga('create', 'UA-71662097-1', 'auto');
+                ga('send', 'pageview');</script>
+        </div>
+    </div>
+    <div class="ui-loader ui-corner-all ui-body-a ui-loader-default">
+        <span class="ui-icon-loading"></span>
+        <h1>loading
+        </h1>
+    </div>
+    <div class="ui-panel-dismiss">
+    </div>
+</body>
+
+</html>
