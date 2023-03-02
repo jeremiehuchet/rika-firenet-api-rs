@@ -1,17 +1,11 @@
-.gitignore
-.travis.yml
-Cargo.toml
-README.md
 docs/StoveApi.md
 docs/StoveControls.md
 docs/StoveFeatures.md
 docs/StoveSensors.md
 docs/StoveStatus.md
-git_push.sh
 src/apis/configuration.rs
 src/apis/mod.rs
 src/apis/stove_api.rs
-src/lib.rs
 src/models/mod.rs
 src/models/stove_controls.rs
 src/models/stove_features.rs

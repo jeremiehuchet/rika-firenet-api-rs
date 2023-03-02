@@ -14,12 +14,15 @@ Method | HTTP request | Description
 
 ## list_stoves
 
-> String list_stoves()
+> String list_stoves(connect_period_sid)
 List available stoves
 
 ### Parameters
 
-This endpoint does not need any parameter.
+
+Name | Type | Description  | Required | Notes
+------------- | ------------- | ------------- | ------------- | -------------
+**connect_period_sid** | **String** | Session cookie | [required] |
 
 ### Return type
 
