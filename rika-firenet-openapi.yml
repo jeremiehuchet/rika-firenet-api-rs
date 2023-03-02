@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Rika Firenet - OpenAPI 3.0
   description: |-
-    This is an OpenAPI descriptor for the Rika Firenet API.
+    Rika Firenet API operations
   version: 1.0.0
 servers:
   - url: https://www.rika-firenet.com
@@ -41,6 +41,45 @@ paths:
               schema:
                 type: string
               description: The session cookie "connect.sid"
+  /web/summary:
+    get:
+      tags:
+        - stove
+      summary: List available stoves
+      operationId: listStoves
+      parameters:
+        - in: cookie
+          name: connect.sid
+          description: Session cookie
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Available stoves
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: The session cookie "connect.sid"
+          content:
+            text/html:
+              schema:
+                type: string
+              example: |-
+                <div data-role="controlgroup">
+                  <h3>You have access to the following stoves:</h3>
+                  <ul id="stoveList" data-role="listview" data-inset="true" data-theme="a" data-split-theme="a" data-split-icon="fa-pencil">
+                    <li>
+                      <a href="/web/stove/68212916" data-ajax="false">Stove A</a>
+                      <a href="/web/edit/68212916" data-ajax="false"/>
+                    </li>
+                    <li>
+                      <a href="/web/stove/83265107" data-ajax="false">Stove B</a>
+                      <a href="/web/edit/83265107" data-ajax="false"/>
+                    </li>
+                  </ul>
+                </div>
   /api/client/{stoveId}/status:
     get:
       tags:
@@ -78,7 +117,7 @@ paths:
       tags:
         - stove
       summary: Set stove parameters
-      operationId: stoveContols
+      operationId: stoveControls
       parameters:
         - in: cookie
           name: connect.sid

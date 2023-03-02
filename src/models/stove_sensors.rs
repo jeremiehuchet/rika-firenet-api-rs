@@ -1,7 +1,7 @@
 /*
  * Rika Firenet - OpenAPI 3.0
  *
- * This is an OpenAPI descriptor for the Rika Firenet API.
+ * Rika Firenet API operations
  *
  * The version of the OpenAPI document: 1.0.0
  * 
