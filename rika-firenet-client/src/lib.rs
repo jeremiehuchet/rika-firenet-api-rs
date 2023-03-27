@@ -1,15 +1,16 @@
-use std::{num::ParseIntError, str::FromStr};
 use lazy_static::lazy_static;
 use regex::Regex;
 use reqwest::ClientBuilder;
-use rika_firenet_openapi::{
-    apis::{
-        Error as RikaError,
-        configuration::Configuration,
-        stove_api::{self, ListStovesError, ListStovesParams, LoginParams, StoveStatusParams, StoveStatusError, LogoutError, LogoutParams, LoginError},
+use rika_firenet_openapi::apis::{
+    configuration::Configuration,
+    stove_api::{
+        self, ListStovesError, ListStovesParams, LoginError, LoginParams, LogoutError,
+        LogoutParams, StoveStatusError, StoveStatusParams,
     },
+    Error as RikaError,
 };
 pub use rika_firenet_openapi::models::StoveStatus;
+use std::{num::ParseIntError, str::FromStr};
 
 const API_BASE_URL: &str = "https://www.rika-firenet.com";
 const FIREFOX_USER_AGENT: &str =
@@ -47,7 +48,11 @@ impl RikaFirenetClient {
         }
     }
 
-    pub async fn login(&self, username: String, password: String) -> Result<(), RikaError<LoginError>> {
+    pub async fn login(
+        &self,
+        username: String,
+        password: String,
+    ) -> Result<(), RikaError<LoginError>> {
         stove_api::login(
             &self.configuration,
             LoginParams {
@@ -68,7 +73,10 @@ impl RikaFirenetClient {
         Ok(stoves)
     }
 
-    pub async fn status(&self, stove_id: String) -> Result<StoveStatus, RikaError<StoveStatusError>> {
+    pub async fn status(
+        &self,
+        stove_id: String,
+    ) -> Result<StoveStatus, RikaError<StoveStatusError>> {
         stove_api::stove_status(
             &self.configuration,
             StoveStatusParams {
