@@ -1,20 +1,15 @@
 use std::{num::ParseIntError, str::FromStr};
-
 use lazy_static::lazy_static;
 use regex::Regex;
 use reqwest::ClientBuilder;
-
-use crate::{
+use rika_firenet_openapi::{
     apis::{
+        Error as RikaError,
         configuration::Configuration,
-        stove_api::{
-            self, ListStovesError, ListStovesParams, LoginError, LoginParams, LogoutError,
-            LogoutParams, StoveStatusError, StoveStatusParams,
-        },
-        Error,
+        stove_api::{self, ListStovesError, ListStovesParams, LoginParams, StoveStatusParams, StoveStatusError, LogoutError, LogoutParams, LoginError},
     },
-    models::StoveStatus,
 };
+pub use rika_firenet_openapi::models::StoveStatus;
 
 const API_BASE_URL: &str = "https://www.rika-firenet.com";
 const FIREFOX_USER_AGENT: &str =
@@ -52,7 +47,7 @@ impl RikaFirenetClient {
         }
     }
 
-    pub async fn login(&self, username: String, password: String) -> Result<(), Error<LoginError>> {
+    pub async fn login(&self, username: String, password: String) -> Result<(), RikaError<LoginError>> {
         stove_api::login(
             &self.configuration,
             LoginParams {
@@ -63,7 +58,7 @@ impl RikaFirenetClient {
         .await
     }
 
-    pub async fn list_stoves(&self) -> Result<Vec<String>, Error<ListStovesError>> {
+    pub async fn list_stoves(&self) -> Result<Vec<String>, RikaError<ListStovesError>> {
         let stove_body =
             stove_api::list_stoves(&self.configuration, ListStovesParams::default()).await?;
         let stoves = STOVELIST_REGEX
@@ -73,7 +68,7 @@ impl RikaFirenetClient {
         Ok(stoves)
     }
 
-    pub async fn status(&self, stove_id: String) -> Result<StoveStatus, Error<StoveStatusError>> {
+    pub async fn status(&self, stove_id: String) -> Result<StoveStatus, RikaError<StoveStatusError>> {
         stove_api::stove_status(
             &self.configuration,
             StoveStatusParams {
@@ -84,7 +79,7 @@ impl RikaFirenetClient {
         .await
     }
 
-    pub async fn logout(&self) -> Result<(), Error<LogoutError>> {
+    pub async fn logout(&self) -> Result<(), RikaError<LogoutError>> {
         stove_api::logout(&self.configuration, LogoutParams::default()).await
     }
 }

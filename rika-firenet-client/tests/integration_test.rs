@@ -5,7 +5,7 @@ use httpmock::{
     MockServer, Regex,
 };
 
-use rika_firenet::client::RikaFirenetClient;
+use rika_firenet_client::RikaFirenetClient;
 
 #[tokio::test]
 async fn can_login() {

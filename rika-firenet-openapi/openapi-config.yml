@@ -1,5 +1,5 @@
 additionalProperties:
-  packageName: rika_firenet
+  packageName: rika-firenet-openapi
   packageVersion: 0.1.0
   useSingleRequestParameter: true
   supportMiddleware: true
