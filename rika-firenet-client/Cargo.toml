@@ -9,6 +9,7 @@ edition = "2021"
 [dependencies]
 lazy_static = "^1.4"
 regex = "^1.7"
+reqwest-middleware = "^0.2"
 rika-firenet-openapi = { path = "../rika-firenet-openapi" }
 
 [dependencies.reqwest]

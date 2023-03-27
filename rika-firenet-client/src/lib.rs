@@ -1,6 +1,7 @@
 use lazy_static::lazy_static;
 use regex::Regex;
 use reqwest::ClientBuilder;
+use reqwest_middleware::ClientBuilder as MiddlewareClientBuilder;
 use rika_firenet_openapi::apis::{
     configuration::Configuration,
     stove_api::{
@@ -35,14 +36,16 @@ impl RikaFirenetClient {
     }
 
     pub fn new_with_base_url(base_url: String) -> Self {
+        let client = ClientBuilder::new()
+            .cookie_store(true)
+            .build()
+            .expect("an http client");
         RikaFirenetClient {
             configuration: Configuration {
                 base_path: base_url,
                 user_agent: Some(FIREFOX_USER_AGENT.to_string()),
-                client: ClientBuilder::new()
-                    .cookie_store(true)
-                    .build()
-                    .expect("an http client"),
+                client: MiddlewareClientBuilder::new(client)
+                    .build(),
                 ..Default::default()
             },
         }
