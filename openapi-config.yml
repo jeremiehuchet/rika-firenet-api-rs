@@ -2,3 +2,4 @@ additionalProperties:
   packageName: rika_firenet
   packageVersion: 0.1.0
   useSingleRequestParameter: true
+  supportMiddleware: true

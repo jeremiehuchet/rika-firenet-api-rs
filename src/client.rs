@@ -1,4 +1,4 @@
-use std::{num::ParseIntError, str::FromStr, time::Instant};
+use std::{num::ParseIntError, str::FromStr};
 
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -6,14 +6,14 @@ use reqwest::ClientBuilder;
 
 use crate::{
     apis::{
-        configuration::{self, Configuration},
+        configuration::Configuration,
         stove_api::{
-            self, ListStovesError, LoginError, LoginParams, LogoutError, LogoutParams,
-            StoveControlsError, StoveControlsParams, StoveStatusError, StoveStatusParams,
+            self, ListStovesError, ListStovesParams, LoginError, LoginParams, LogoutError,
+            LogoutParams, StoveStatusError, StoveStatusParams,
         },
         Error,
     },
-    models::{StoveControls, StoveStatus},
+    models::StoveStatus,
 };
 
 const API_BASE_URL: &str = "https://www.rika-firenet.com";
@@ -28,6 +28,7 @@ lazy_static! {
             Regex::new("(?P<firstStartHH>\\d{2})(?P<firstStartMM>\\d{2})(?P<firstEndHH>\\d{2})(?P<firstEndMM>\\d{2})(?P<secondStartHH>\\d{2})(?P<secondStartMM>\\d{2})(?P<secondndHH>\\d{2})(?P<secondEndMM>\\d{2})").unwrap();
 }
 
+#[derive(Clone)]
 pub struct RikaFirenetClient {
     configuration: Configuration,
 }
@@ -63,7 +64,8 @@ impl RikaFirenetClient {
     }
 
     pub async fn list_stoves(&self) -> Result<Vec<String>, Error<ListStovesError>> {
-        let stove_body = stove_api::list_stoves(&self.configuration).await?;
+        let stove_body =
+            stove_api::list_stoves(&self.configuration, ListStovesParams::default()).await?;
         let stoves = STOVELIST_REGEX
             .captures_iter(&stove_body)
             .map(|caps| caps["stoveId"].to_string())

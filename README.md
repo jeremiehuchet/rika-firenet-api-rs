@@ -24,9 +24,10 @@ All URIs are relative to *https://www.rika-firenet.com*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
+*StoveApi* | [**list_stoves**](docs/StoveApi.md#list_stoves) | **GET** /web/summary | List available stoves
 *StoveApi* | [**login**](docs/StoveApi.md#login) | **POST** /web/login | Login to Rika Firenet API
 *StoveApi* | [**logout**](docs/StoveApi.md#logout) | **GET** /web/logout | Logout from Rika Firenet API
-*StoveApi* | [**stove_contols**](docs/StoveApi.md#stove_contols) | **POST** /api/client/{stoveId}/controls | Set stove parameters
+*StoveApi* | [**stove_controls**](docs/StoveApi.md#stove_controls) | **POST** /api/client/{stoveId}/controls | Set stove parameters
 *StoveApi* | [**stove_status**](docs/StoveApi.md#stove_status) | **GET** /api/client/{stoveId}/status | Get stove status
 
 

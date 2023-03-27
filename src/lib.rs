@@ -6,6 +6,6 @@ extern crate serde;
 extern crate serde_json;
 extern crate url;
 
-mod apis;
+pub mod apis;
 pub mod client;
 pub mod models;
