@@ -7,15 +7,28 @@ license = "GTPL-3.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "^1.0"
+async-trait = "^0.1"
 lazy_static = "^1.4"
+log = "^0.4"
+prometheus = { version = "^0.13", optional = true }
 regex = "^1.7"
 reqwest-middleware = "^0.2"
+reqwest-prometheus-middleware = { path = "../../reqwest-prometheus-middleware", optional = true }
 rika-firenet-openapi = { path = "../rika-firenet-openapi" }
+task-local-extensions = "^0.1"
 
 [dependencies.reqwest]
 version = "^0.11"
 features = ["cookies", "json", "multipart"]
 
+[features]
+prometheus = ["dep:prometheus", "dep:reqwest-prometheus-middleware"]
+
 [dev-dependencies]
-httpmock = "0.6"
-tokio = "1.25"
+httpmock = "^0.6"
+testcontainers = "^0.14"
+tokio = "^1.25"
+
+[build-dependencies]
+anyhow = "^1.0"

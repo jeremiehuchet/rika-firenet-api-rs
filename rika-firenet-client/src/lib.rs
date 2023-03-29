@@ -1,17 +1,21 @@
+use auth::RetryWithAuthMiddleware;
 use lazy_static::lazy_static;
+use log::debug;
 use regex::Regex;
-use reqwest::ClientBuilder;
-use reqwest_middleware::ClientBuilder as MiddlewareClientBuilder;
+use reqwest::{redirect::Policy, Client};
+use reqwest_middleware::ClientBuilder;
 use rika_firenet_openapi::apis::{
     configuration::Configuration,
     stove_api::{
-        self, ListStovesError, ListStovesParams, LoginError, LoginParams, LogoutError,
-        LogoutParams, StoveStatusError, StoveStatusParams,
+        self, ListStovesError, ListStovesParams, LoginParams, LogoutError, LogoutParams,
+        StoveStatusError, StoveStatusParams,
     },
     Error as RikaError,
 };
 pub use rika_firenet_openapi::models::StoveStatus;
-use std::{num::ParseIntError, str::FromStr};
+
+mod auth;
+mod model;
 
 const API_BASE_URL: &str = "https://www.rika-firenet.com";
 const FIREFOX_USER_AGENT: &str =
@@ -25,55 +29,88 @@ lazy_static! {
             Regex::new("(?P<firstStartHH>\\d{2})(?P<firstStartMM>\\d{2})(?P<firstEndHH>\\d{2})(?P<firstEndMM>\\d{2})(?P<secondStartHH>\\d{2})(?P<secondStartMM>\\d{2})(?P<secondndHH>\\d{2})(?P<secondEndMM>\\d{2})").unwrap();
 }
 
+#[derive(Default)]
+pub struct RikaFirenetClientBuilder {
+    base_url: Option<String>,
+    credentials: Option<LoginParams>,
+    #[cfg(feature = "prometheus")]
+    registry: Option<Registry>,
+}
+
+impl RikaFirenetClientBuilder {
+    pub fn base_url<S: Into<String>>(mut self, base_url: S) -> Self {
+        self.base_url = Some(base_url.into());
+        self
+    }
+
+    pub fn credentials<S: Into<String>>(mut self, username: S, password: S) -> Self {
+        self.credentials = Some(LoginParams {
+            email: username.into(),
+            password: password.into(),
+        });
+        self
+    }
+
+    #[cfg(feature = "prometheus")]
+    pub fn enable_metrics(mut self, registry: Registry) -> Self {
+        self.registry = Some(registry);
+        self
+    }
+
+    pub fn build(self) -> RikaFirenetClient {
+        let inner_client = Client::builder()
+            .cookie_store(true)
+            .redirect(Policy::none())
+            .build()
+            .expect("an http client");
+
+        let api_configuration = Configuration {
+            base_path: self.base_url.unwrap_or(API_BASE_URL.to_string()),
+            user_agent: Some(FIREFOX_USER_AGENT.to_string()),
+            ..Default::default()
+        };
+
+        let login_client = ClientBuilder::new(inner_client.clone());
+        #[cfg(feature = "prometheus")]
+        login_client.with(PrometheusMiddleware::new(self.registry));
+        let login_middleware = RetryWithAuthMiddleware::new(
+            Configuration {
+                client: login_client.build(),
+                ..api_configuration.clone()
+            },
+            self.credentials
+                .expect("API can't be used without credentials"),
+        );
+
+        let mut api_client = ClientBuilder::new(inner_client).with(login_middleware);
+        #[cfg(feature = "prometheus")]
+        client.with(PrometheusMiddleware::new(self.registry));
+        RikaFirenetClient {
+            configuration: Configuration {
+                client: api_client.build(),
+                ..api_configuration
+            },
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct RikaFirenetClient {
     configuration: Configuration,
 }
 
 impl RikaFirenetClient {
-    pub fn new() -> Self {
-        Self::new_with_base_url(API_BASE_URL.to_string())
-    }
-
-    pub fn new_with_base_url(base_url: String) -> Self {
-        let client = ClientBuilder::new()
-            .cookie_store(true)
-            .build()
-            .expect("an http client");
-        RikaFirenetClient {
-            configuration: Configuration {
-                base_path: base_url,
-                user_agent: Some(FIREFOX_USER_AGENT.to_string()),
-                client: MiddlewareClientBuilder::new(client)
-                    .build(),
-                ..Default::default()
-            },
-        }
-    }
-
-    pub async fn login(
-        &self,
-        username: String,
-        password: String,
-    ) -> Result<(), RikaError<LoginError>> {
-        stove_api::login(
-            &self.configuration,
-            LoginParams {
-                email: username,
-                password,
-            },
-        )
-        .await
+    pub fn builder() -> RikaFirenetClientBuilder {
+        RikaFirenetClientBuilder::default()
     }
 
     pub async fn list_stoves(&self) -> Result<Vec<String>, RikaError<ListStovesError>> {
-        let stove_body =
+        let stove_body: String =
             stove_api::list_stoves(&self.configuration, ListStovesParams::default()).await?;
-        let stoves = STOVELIST_REGEX
-            .captures_iter(&stove_body)
-            .map(|caps| caps["stoveId"].to_string())
-            .collect();
-        Ok(stoves)
+        debug!("List stoves result: {stove_body}");
+        let stove_ids = extract_stove_ids(&stove_body);
+        debug!("Extracted stoves ids: {}", stove_ids.join(", "));
+        Ok(stove_ids)
     }
 
     pub async fn status(
@@ -95,163 +132,107 @@ impl RikaFirenetClient {
     }
 }
 
-pub enum StoveControl {
-    OperatingMode(OperatingMode),
-    HeatingPower(i32),
-    EnableHeatingSchedule(bool),
-    HeatingSchedule(HeatingSchedule),
+fn extract_stove_ids(body: &String) -> Vec<String> {
+    STOVELIST_REGEX
+        .captures_iter(&body)
+        .map(|caps| caps["stoveId"].to_string())
+        .collect()
 }
 
-pub enum OperatingMode {
-    Manual,
+#[cfg(test)]
+mod tests {
+    use httpmock::{Method::GET, MockServer};
 
-    Auto,
+    use crate::{extract_stove_ids, RikaFirenetClient};
 
-    Comfort,
-}
+    const PARTIAL_SUMMARY_EXAMPLE: &str = r#"
+    <div role="main" class="ui-content">
+        <div data-role="controlgroup">
+            <h3>You have access to the following stoves</h3>
+            <ul id="stoveList" data-role="listview" data-inset="true" data-theme="a" data-split-theme="a"
+                data-split-icon="fa-pencil">
+                <li class="ui-li-has-alt ui-first-child">
+                    <a href="/web/stove/12345" data-ajax="false" class="ui-btn ui-first-child">Stove n°12345</a>
+                    <a href="/web/edit/12345" data-ajax="false" class="ui-btn ui-btn-icon-notext ui-icon-fa-pencil ui-btn-a ui-last-child" title=""></a>
+                </li>
+                <li class="ui-li-has-alt ui-last-child">
+                    <a href="/web/stove/333444" data-ajax="false" class="ui-btn ui-first-child">Stove n°333444</a>
+                    <a href="/web/edit/333444" data-ajax="false" class="ui-btn ui-btn-icon-notext ui-icon-fa-pencil ui-btn-a ui-last-child" title=""></a>
+                </li>
+            </ul>
+        </div>
+    </div>
+    "#;
 
-impl Into<i32> for OperatingMode {
-    fn into(self) -> i32 {
-        match self {
-            OperatingMode::Manual => 0,
-            OperatingMode::Auto => 1,
-            OperatingMode::Comfort => 2,
-        }
+    #[test]
+    fn can_extract_stove_ids() {
+        let actual = extract_stove_ids(&PARTIAL_SUMMARY_EXAMPLE.to_string());
+        let expected = vec!["12345".to_string(), "333444".to_string()];
+        assert_eq!(actual, expected)
     }
-}
 
-impl OperatingMode {
-    fn parse(mode: i32) -> Result<Self, String> {
-        match mode {
-            0 => Ok(OperatingMode::Manual),
-            1 => Ok(OperatingMode::Auto),
-            2 => Ok(OperatingMode::Comfort),
-            num => Err(format!("{num} is not a valid OperatingMode")),
-        }
+    #[tokio::test]
+    async fn can_list_stoves() {
+        let server = MockServer::start();
+        let summary_mock = server.mock(|when, then| {
+            when.method(GET).path("/web/summary");
+            then.status(200).body_from_file("../mock/src/summary.html");
+        });
+
+        let client = RikaFirenetClient::builder()
+            .base_url(server.base_url())
+            .credentials("someone@rika.com", "Secret!")
+            .build();
+
+        let stoves = client.list_stoves().await.unwrap();
+
+        assert_eq!(stoves, vec!["12345", "333444"], "expect 2 stoves ids");
+        summary_mock.assert();
     }
-}
 
-pub struct HeatingSchedule {
-    monday: DailySchedule,
-    tuesday: DailySchedule,
-    wednesday: DailySchedule,
-    thursday: DailySchedule,
-    friday: DailySchedule,
-    saturday: DailySchedule,
-    sunday: DailySchedule,
-}
+    #[tokio::test]
+    async fn can_get_stove_status() {
+        let server = MockServer::start();
+        let status_mock = server.mock(|when, then| {
+            when.method(GET).path("/api/client/12345/status");
+            then.status(200)
+                .body_from_file("../mock/src/stove-status.json");
+        });
 
-impl HeatingSchedule {
-    fn from(status: StoveStatus) -> Result<Self, ParseIntError> {
-        Ok(HeatingSchedule {
-            monday: DailySchedule::from(
-                status.controls.heating_time_mon1,
-                status.controls.heating_time_mon2,
-            )?,
-            tuesday: DailySchedule::from(
-                status.controls.heating_time_thu1,
-                status.controls.heating_time_thu2,
-            )?,
-            wednesday: DailySchedule::from(
-                status.controls.heating_time_wed1,
-                status.controls.heating_time_wed2,
-            )?,
-            thursday: DailySchedule::from(
-                status.controls.heating_time_tue1,
-                status.controls.heating_time_tue2,
-            )?,
-            friday: DailySchedule::from(
-                status.controls.heating_time_fri1,
-                status.controls.heating_time_fri2,
-            )?,
-            saturday: DailySchedule::from(
-                status.controls.heating_time_sat1,
-                status.controls.heating_time_sat2,
-            )?,
-            sunday: DailySchedule::from(
-                status.controls.heating_time_sun1,
-                status.controls.heating_time_sun2,
-            )?,
-        })
+        let client = RikaFirenetClient::builder()
+            .base_url(server.base_url())
+            .credentials("someone@rika.com", "Secret!")
+            .build();
+
+        let status = client.status("12345".to_string()).await.unwrap();
+
+        assert_eq!(status.stove_id, "__stove_id__", "stove id");
+        assert_eq!(status.name, "Stove __stove_id__", "stove name");
+        assert_eq!(
+            status.sensors.input_room_temperature, "19.6",
+            "sensor value"
+        );
+        status_mock.assert();
     }
-}
 
-#[derive(Default)]
-pub struct DailySchedule {
-    first: HeatPeriod,
-    second: HeatPeriod,
-}
+    #[tokio::test]
+    async fn can_logout() {
+        let server = MockServer::start();
+        let logout_mock = server.mock(|when, then| {
+            when.method(GET).path("/web/logout");
+            then.status(302).header(
+                "Set-Cookie",
+                "connect.sid=xxx.xxx; Path=/; Expires=Fri, 10 Mar 2063 15:14:41 GMT; HttpOnly",
+            );
+        });
 
-impl DailySchedule {
-    pub fn single(heat_period: HeatPeriod) -> Self {
-        DailySchedule {
-            first: heat_period,
-            second: Default::default(),
-        }
-    }
-    pub fn dual(first_period: HeatPeriod, second_period: HeatPeriod) -> Self {
-        DailySchedule {
-            first: first_period,
-            second: second_period,
-        }
-    }
-    pub fn from(first: Option<String>, second: Option<String>) -> Result<Self, ParseIntError> {
-        Ok(DailySchedule {
-            first: first.unwrap_or_default().parse()?,
-            second: second.unwrap_or_default().parse()?,
-        })
-    }
-}
+        let client = RikaFirenetClient::builder()
+            .base_url(server.base_url())
+            .credentials("someone@rika.com", "Secret!")
+            .build();
 
-#[derive(Default)]
-pub struct HeatPeriod {
-    begin: HeatTime,
-    end: HeatTime,
-}
+        client.logout().await.unwrap();
 
-impl Into<String> for HeatPeriod {
-    fn into(self) -> String {
-        format!(
-            "{:0>2}{:0>2}{:0>2}{:0>2}",
-            self.begin.hours, self.begin.minutes, self.end.hours, self.end.minutes
-        )
-    }
-}
-
-impl FromStr for HeatPeriod {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, ParseIntError> {
-        let (begin, end) = s.split_at(4);
-        Ok(HeatPeriod {
-            begin: FromStr::from_str(begin)?,
-            end: FromStr::from_str(end)?,
-        })
-    }
-}
-
-pub struct HeatTime {
-    hours: u8,
-    minutes: u8,
-}
-
-impl FromStr for HeatTime {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, ParseIntError> {
-        let (hh, mm) = s.split_at(2);
-        Ok(HeatTime {
-            hours: u8::from_str(hh)?,
-            minutes: u8::from_str(mm)?,
-        })
-    }
-}
-
-impl Default for HeatTime {
-    fn default() -> Self {
-        HeatTime {
-            hours: 0,
-            minutes: 0,
-        }
+        logout_mock.assert();
     }
 }

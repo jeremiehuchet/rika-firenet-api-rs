@@ -35,12 +35,23 @@ paths:
                 - password
       responses:
         '302':
-          description: Successful login
+          description: |
+            The server replies with the same response whatever the login request was successful or not.
           headers:
-            Set-Cookie:
+            Location:
               schema:
                 type: string
+                example: /web/summary
+            Set-Cookie:
               description: The session cookie "connect.sid"
+              schema:
+                type: string
+                example: connect.sid=s%3Asbv1hwH39atjzatfF3u66W62WJDTFENq.JTcNVvOdmQimWrRXZVM01Tt8ghtChHdzwneMlt2Jf10; Path=/; Expires=Fri, 14 Apr 2050 16:27:54 GMT; HttpOnly
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Found. Redirecting to /web/summary
   /web/summary:
     get:
       tags:
@@ -80,6 +91,24 @@ paths:
                     </li>
                   </ul>
                 </div>
+        '302':
+          description: Authentication required
+          headers:
+            Location:
+              schema:
+                type: string
+                example: /web/
+            Set-Cookie:
+              description: the session cookie "connect.sid"
+              schema:
+                type: string
+                example: connect.sid=s%3AFq1R1F5jBqUTQBbPlmR0Sce6NlM9uwNL.0ScdTnDY%2FRz2VJ10zKcyYfqJIfrNQcExc1%2BCJ41PFUY; Path=/; Expires=Fri, 14 Apr 2050 16:27:54 GMT; HttpOnly
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Found. Redirecting to /web/
+          
   /api/client/{stoveId}/status:
     get:
       tags:
@@ -102,16 +131,33 @@ paths:
       responses:
         '200':
           description: Stove status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoveStatus'
+        '401':
+          description: |
+            Authentication required:
+              - missing cookie
+              - invalid session
           headers:
             Cookie:
               required: true
-              description: The session cookie "connect.sid" with extended lifetime
+              description: The session cookie "connect.sid"
               schema:
                 type: string
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/StoveStatus'
+        '500':
+          description: |
+            The given stove id doesn't belong to the signed-in account.
+          content:
+            application/json:
+              schema:
+                type: string
+                example: Stove 83265107 is not registered for user someone@rika.com
   /api/client/{stoveId}/controls:
     post:
       tags:
@@ -169,6 +215,21 @@ paths:
       responses:
         '302':
           description: Successful logout
+          headers:
+            Location:
+              schema:
+                type: string
+                example: /web/login
+            Set-Cookie:
+              description: a new session cookie "connect.sid"
+              schema:
+                type: string
+                example: connect.sid=s%3AFq1R1F5jBqUTQBbPlmR0Sce6NlM9uwNL.0ScdTnDY%2FRz2VJ10zKcyYfqJIfrNQcExc1%2BCJ41PFUY; Path=/; Expires=Fri, 14 Apr 2050 16:27:54 GMT; HttpOnly
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Found. Redirecting to /web/login
 components:
   schemas:
     StoveStatus:

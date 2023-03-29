@@ -41,7 +41,7 @@
     },
     "lastConfirmedRevision": 1572181181,
     "lastSeenMinutes": 0,
-    "name": "Stove n1",
+    "name": "Stove __stove_id__",
     "oem": "RIKA",
     "sensors": {
         "inputBakeTemperature": "1024",
@@ -141,6 +141,6 @@
         "multiAir1": true,
         "multiAir2": false
     },
-    "stoveID": "12345",
+    "stoveID": "__stove_id__",
     "stoveType": "DOMO"
 }

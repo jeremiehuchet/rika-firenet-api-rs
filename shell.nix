@@ -1,6 +1,6 @@
 let
-  # release 22.11, 2023-02-20
-  pkgs = import (fetchTarball("https://github.com/NixOS/nixpkgs/archive/cd56369075acb5fa8459e640b56a0dc1f05e1022.tar.gz")) {};
+  # release 22.11, 2023-05-19
+  pkgs = import (fetchTarball("https://github.com/NixOS/nixpkgs/archive/03f2eb03bf67cda480680f82782889afa8d85b18.tar.gz")) {};
   openapi-generator-cli-6_4 = pkgs.openapi-generator-cli.overrideAttrs (finalAttrs: previousAttrs: {
     version = "6.4.0";
     src = pkgs.fetchurl {
@@ -10,12 +10,12 @@ let
   });
 in pkgs.mkShell {
   buildInputs = with pkgs; [
-    cargo
     openapi-generator-cli-6_4
     openssl
     pkg-config
-    rustc
-    rustfmt
+    rust_1_66.packages.stable.cargo
+    rust_1_66.packages.stable.rustc
+    rust_1_66.packages.stable.rustfmt
     vscode
   ];
   RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
