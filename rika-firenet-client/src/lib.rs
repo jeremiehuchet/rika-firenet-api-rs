@@ -1,9 +1,12 @@
+use std::sync::Arc;
+
 use auth::RetryWithAuthMiddleware;
 use lazy_static::lazy_static;
 use log::debug;
 use regex::Regex;
 use reqwest::{redirect::Policy, Client};
 use reqwest_middleware::ClientBuilder;
+use reqwest_prometheus_middleware::PrometheusMiddleware;
 use rika_firenet_openapi::apis::{
     configuration::Configuration,
     stove_api::{
@@ -33,8 +36,7 @@ lazy_static! {
 pub struct RikaFirenetClientBuilder {
     base_url: Option<String>,
     credentials: Option<LoginParams>,
-    #[cfg(feature = "prometheus")]
-    registry: Option<Registry>,
+    prometheus_middleware: Option<Arc<PrometheusMiddleware>>,
 }
 
 impl RikaFirenetClientBuilder {
@@ -51,9 +53,11 @@ impl RikaFirenetClientBuilder {
         self
     }
 
-    #[cfg(feature = "prometheus")]
-    pub fn enable_metrics(mut self, registry: Registry) -> Self {
-        self.registry = Some(registry);
+    pub fn enable_metrics(
+        mut self,
+        reqwest_prometheus_middleware: Arc<PrometheusMiddleware>,
+    ) -> Self {
+        self.prometheus_middleware = Some(reqwest_prometheus_middleware);
         self
     }
 
@@ -70,9 +74,11 @@ impl RikaFirenetClientBuilder {
             ..Default::default()
         };
 
-        let login_client = ClientBuilder::new(inner_client.clone());
-        #[cfg(feature = "prometheus")]
-        login_client.with(PrometheusMiddleware::new(self.registry));
+        let mut login_client = ClientBuilder::new(inner_client.clone());
+        if let Some(prometheus_middleware) = self.prometheus_middleware.as_ref() {
+            login_client = login_client.with_arc(prometheus_middleware.clone());
+        }
+
         let login_middleware = RetryWithAuthMiddleware::new(
             Configuration {
                 client: login_client.build(),
@@ -83,8 +89,9 @@ impl RikaFirenetClientBuilder {
         );
 
         let mut api_client = ClientBuilder::new(inner_client).with(login_middleware);
-        #[cfg(feature = "prometheus")]
-        client.with(PrometheusMiddleware::new(self.registry));
+        if let Some(prometheus_middleware) = self.prometheus_middleware {
+            api_client = api_client.with_arc(prometheus_middleware);
+        }
         RikaFirenetClient {
             configuration: Configuration {
                 client: api_client.build(),
@@ -141,7 +148,11 @@ fn extract_stove_ids(body: &String) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use httpmock::{Method::GET, MockServer};
+    use prometheus::Registry;
+    use reqwest_prometheus_middleware::PrometheusMiddleware;
 
     use crate::{extract_stove_ids, RikaFirenetClient};
 
@@ -234,5 +245,25 @@ mod tests {
         client.logout().await.unwrap();
 
         logout_mock.assert();
+    }
+
+    #[tokio::test]
+    async fn should_collect_metrics() {
+        let registry = Registry::default();
+        let client = RikaFirenetClient::builder()
+            .base_url("http://localhost/not-found")
+            .credentials("someone@rika.com", "Secret!")
+            .enable_metrics(Arc::new(PrometheusMiddleware::new_with_registry(&registry)))
+            .build();
+
+        client.list_stoves().await.unwrap_err();
+
+        let metrics = registry.gather();
+        let m = metrics
+            .iter()
+            .find(|m| m.get_name() == "http_client_requests")
+            .unwrap();
+        let requests_count = m.get_metric()[0].get_histogram().get_sample_count();
+        assert_eq!(requests_count, 1);
     }
 }
