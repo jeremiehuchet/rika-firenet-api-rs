@@ -1,8 +1,10 @@
 #!/bin/env sh
 set -e
 
+workdir=$(cd $(dirname $0) ; pwd)
+
 openapi-generator-cli generate \
         -g rust \
-        -o rika-firenet-openapi \
-        -i rika-firenet-openapi/rika-firenet-openapi.yml \
-        -c rika-firenet-openapi/openapi-config.yml
+        -o $workdir \
+        -i $workdir/rika-firenet-openapi.yml \
+        -c $workdir/openapi-config.yml
