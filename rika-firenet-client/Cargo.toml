@@ -3,7 +3,7 @@ name = "rika-firenet-client"
 version = "0.1.0"
 authors = ["Jeremie Huchet"]
 description = "Rika Firenet API client"
-license = "GTPL-3.0"
+license = "GPL-3.0"
 edition = "2021"
 
 [dependencies]
