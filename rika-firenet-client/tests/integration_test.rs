@@ -1,4 +1,3 @@
-
 use reqwest::Client;
 use rika_firenet_client::{RikaFirenetClient, RikaFirenetClientBuilder};
 use testcontainers::{

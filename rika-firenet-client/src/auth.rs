@@ -68,6 +68,9 @@ fn is_login_or_logout_request(request: &Request) -> bool {
 }
 
 fn is_login_redirection(response: &Response) -> bool {
+    if response.status() == 401 {
+        return true;
+    }
     if response.status() != 302 {
         return false;
     }
