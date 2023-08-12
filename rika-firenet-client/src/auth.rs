@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use log::debug;
-use reqwest::{header::HeaderName, Request, Response};
+use reqwest::{Request, Response};
 use reqwest_middleware::{Error, Middleware, Next, Result};
 use rika_firenet_openapi::apis::{
     configuration::Configuration,

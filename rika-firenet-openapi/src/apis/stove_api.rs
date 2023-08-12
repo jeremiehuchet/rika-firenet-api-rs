@@ -135,7 +135,7 @@ pub async fn list_stoves(configuration: &configuration::Configuration, params: L
     let local_var_configuration = configuration;
 
     // unbox the parameters
-    let connect_period_sid = params.connect_period_sid;
+    let _connect_period_sid = params.connect_period_sid;
 
 
     let local_var_client = &local_var_configuration.client;
@@ -202,7 +202,7 @@ pub async fn logout(configuration: &configuration::Configuration, params: Logout
     let local_var_configuration = configuration;
 
     // unbox the parameters
-    let connect_period_sid = params.connect_period_sid;
+    let _connect_period_sid = params.connect_period_sid;
 
 
     let local_var_client = &local_var_configuration.client;
@@ -233,7 +233,7 @@ pub async fn stove_controls(configuration: &configuration::Configuration, params
     let local_var_configuration = configuration;
 
     // unbox the parameters
-    let connect_period_sid = params.connect_period_sid;
+    let _connect_period_sid = params.connect_period_sid;
     let stove_id = params.stove_id;
     let room_power_request = params.room_power_request;
     let bake_temperature = params.bake_temperature;
@@ -419,7 +419,7 @@ pub async fn stove_status(configuration: &configuration::Configuration, params: 
     let local_var_configuration = configuration;
 
     // unbox the parameters
-    let connect_period_sid = params.connect_period_sid;
+    let _connect_period_sid = params.connect_period_sid;
     let stove_id = params.stove_id;
 
 
