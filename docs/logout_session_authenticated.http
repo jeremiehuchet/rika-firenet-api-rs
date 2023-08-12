@@ -1,0 +1,33 @@
+# logout from an authenticated session
+#     http -v https://www.rika-firenet.com/web/logout "Cookie:connect.sid=s%3ASsCsJfdbg_gUP8tJnSmlro3DwqyZQZZ4.BpekNz%2BSfs9JiW0H40hAFF9T0Yr61eafkbzUXf257%2B0"
+GET /web/logout HTTP/1.1
+Accept: */*
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Cookie: connect.sid=s%3AOWI3YmE3ZmY3YWE5YTk4MjE1MmQwY2Yz.DYwMmRjZDgyMDNiM2IzYzdmMmQ1NmVjMTIzYmQ3N2ExY2FkMz
+Host: www.rika-firenet.com
+User-Agent: HTTPie/3.2.2
+
+
+
+HTTP/1.1 302 Found
+Connection: keep-alive
+Content-Length: 32
+Content-Security-Policy: default-src 'self' fonts.gstatic.com fonts.googleapis.com bf56065spx.bf.dynatrace.com www.google.com www.gstatic.com www.google-analytics.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com fonts.gstatic.com www.google.com www.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' js-cdn.dynatrace.com www.google-analytics.com www.google.com www.gstatic.com; img-src 'self' data: www.google-analytics.com www.google.com www.gstatic.com
+Content-Type: text/plain; charset=utf-8
+Date: Fri, 19 May 2023 19:31:27 GMT
+Location: /web/login
+Server: Cowboy
+Set-Cookie: connect.sid=s%3AOWI3YmE3ZmY3YWE5YTk4MjE1MmQwY2Yz.DYwMmRjZDgyMDNiM2IzYzdmMmQ1NmVjMTIzYmQ3N2ExY2FkMz; Path=/; Expires=Fri, 02 Jun 2023 19:31:27 GMT; HttpOnly
+Strict-Transport-Security: max-age=15552000; includeSubDomains
+Vary: Accept, Accept-Encoding
+Via: 1.1 vegur
+X-Content-Security-Policy: default-src 'self' fonts.gstatic.com fonts.googleapis.com bf56065spx.bf.dynatrace.com www.google.com www.gstatic.com www.google-analytics.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com fonts.gstatic.com www.google.com www.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' js-cdn.dynatrace.com www.google-analytics.com www.google.com www.gstatic.com; img-src 'self' data: www.google-analytics.com www.google.com www.gstatic.com
+X-Content-Type-Options: nosniff
+X-Dns-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Webkit-Csp: default-src 'self' fonts.gstatic.com fonts.googleapis.com bf56065spx.bf.dynatrace.com www.google.com www.gstatic.com www.google-analytics.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com fonts.gstatic.com www.google.com www.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' js-cdn.dynatrace.com www.google-analytics.com www.google.com www.gstatic.com; img-src 'self' data: www.google-analytics.com www.google.com www.gstatic.com
+X-Xss-Protection: 1; mode=block
+
+Found. Redirecting to /web/login

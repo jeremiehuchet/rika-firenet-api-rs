@@ -73,7 +73,7 @@ app.get('/api/client/:stoveId/status', (req, res) => {
   const stoveId = req.params.stoveId
   if (!req.session.user) {
     res.body = 'Authorisation required!'
-    res.redirect(401)
+    res.sendStatus(401)
   } else if (['12345', '333444'].includes(stoveId)) {
     const stoveStatusBody = fs.readFileSync('stove-status.json', 'utf8')
       .replaceAll('__stove_id__', stoveId)

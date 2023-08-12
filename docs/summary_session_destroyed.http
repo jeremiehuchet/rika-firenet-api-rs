@@ -1,0 +1,33 @@
+# accessing summary page with an expired of destroyed session
+#     http https://www.rika-firenet.com/web/summary "Cookie:connect.sid=s%3AsjRiMzUzMTkyOWYyNWNlY2Q4YTU2NWNj.yMWRlNGNkMzBhODFhMGI1Njg4NGVlY2RiMTc2MzUu66"
+GET /web/summary HTTP/1.1
+Accept: */*
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Cookie: connect.sid=s%3AsjRiMzUzMTkyOWYyNWNlY2Q4YTU2NWNj.yMWRlNGNkMzBhODFhMGI1Njg4NGVlY2RiMTc2MzUu66
+Host: www.rika-firenet.com
+User-Agent: HTTPie/3.2.2
+
+
+
+HTTP/1.1 302 Found
+Connection: keep-alive
+Content-Length: 27
+Content-Security-Policy: default-src 'self' fonts.gstatic.com fonts.googleapis.com bf56065spx.bf.dynatrace.com www.google.com www.gstatic.com www.google-analytics.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com fonts.gstatic.com www.google.com www.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' js-cdn.dynatrace.com www.google-analytics.com www.google.com www.gstatic.com; img-src 'self' data: www.google-analytics.com www.google.com www.gstatic.com
+Content-Type: text/plain; charset=utf-8
+Date: Fri, 19 May 2023 19:31:49 GMT
+Location: /web/
+Server: Cowboy
+Set-Cookie: connect.sid=s%xYTcxMTRhMjNhZGRjZWIzNmQ0Y2ZhZTRiM.NTM3ZDgzMDcyNTI3ZDIzNzc1Y2U3MjdjZTUzMjhlNWZkZTE; Path=/; Expires=Fri, 02 Jun 2023 19:31:49 GMT; HttpOnly
+Strict-Transport-Security: max-age=15552000; includeSubDomains
+Vary: Accept, Accept-Encoding
+Via: 1.1 vegur
+X-Content-Security-Policy: default-src 'self' fonts.gstatic.com fonts.googleapis.com bf56065spx.bf.dynatrace.com www.google.com www.gstatic.com www.google-analytics.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com fonts.gstatic.com www.google.com www.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' js-cdn.dynatrace.com www.google-analytics.com www.google.com www.gstatic.com; img-src 'self' data: www.google-analytics.com www.google.com www.gstatic.com
+X-Content-Type-Options: nosniff
+X-Dns-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Webkit-Csp: default-src 'self' fonts.gstatic.com fonts.googleapis.com bf56065spx.bf.dynatrace.com www.google.com www.gstatic.com www.google-analytics.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com fonts.gstatic.com www.google.com www.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' js-cdn.dynatrace.com www.google-analytics.com www.google.com www.gstatic.com; img-src 'self' data: www.google-analytics.com www.google.com www.gstatic.com
+X-Xss-Protection: 1; mode=block
+
+Found. Redirecting to /web/
