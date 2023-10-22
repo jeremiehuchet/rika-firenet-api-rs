@@ -1,28 +1,23 @@
-# \StoveApi
+# \StovesApi
 
 All URIs are relative to *https://www.rika-firenet.com*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**list_stoves**](StoveApi.md#list_stoves) | **GET** /web/summary | List available stoves
-[**login**](StoveApi.md#login) | **POST** /web/login | Login to Rika Firenet API
-[**logout**](StoveApi.md#logout) | **GET** /web/logout | Logout from Rika Firenet API
-[**stove_controls**](StoveApi.md#stove_controls) | **POST** /api/client/{stoveId}/controls | Set stove parameters
-[**stove_status**](StoveApi.md#stove_status) | **GET** /api/client/{stoveId}/status | Get stove status
+[**list_stoves**](StovesApi.md#list_stoves) | **GET** /web/summary | List available stoves
+[**stove_controls**](StovesApi.md#stove_controls) | **POST** /api/client/{stoveId}/controls | Set stove parameters
+[**stove_status**](StovesApi.md#stove_status) | **GET** /api/client/{stoveId}/status | Get stove status
 
 
 
 ## list_stoves
 
-> String list_stoves(connect_period_sid)
+> String list_stoves()
 List available stoves
 
 ### Parameters
 
-
-Name | Type | Description  | Required | Notes
-------------- | ------------- | ------------- | ------------- | -------------
-**connect_period_sid** | **String** | Session cookie | [required] |
+This endpoint does not need any parameter.
 
 ### Return type
 
@@ -30,7 +25,7 @@ Name | Type | Description  | Required | Notes
 
 ### Authorization
 
-No authorization required
+[cookieAuth](../README.md#cookieAuth)
 
 ### HTTP request headers
 
@@ -40,66 +35,9 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 
-## login
-
-> login(email, password)
-Login to Rika Firenet API
-
-### Parameters
-
-
-Name | Type | Description  | Required | Notes
-------------- | ------------- | ------------- | ------------- | -------------
-**email** | **String** | Rika Firenet account email | [required] |
-**password** | **String** | Rika Firenet password | [required] |
-
-### Return type
-
- (empty response body)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: application/x-www-form-urlencoded
-- **Accept**: text/plain
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
-
-
-## logout
-
-> logout(connect_period_sid)
-Logout from Rika Firenet API
-
-### Parameters
-
-
-Name | Type | Description  | Required | Notes
-------------- | ------------- | ------------- | ------------- | -------------
-**connect_period_sid** | **String** | Session cookie | [required] |
-
-### Return type
-
- (empty response body)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: Not defined
-- **Accept**: text/plain
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
-
-
 ## stove_controls
 
-> stove_controls(connect_period_sid, stove_id, room_power_request, bake_temperature, convection_fan1_active, convection_fan1_area, convection_fan1_level, convection_fan2_active, convection_fan2_area, convection_fan2_level, debug0, debug1, debug2, debug3, debug4, eco_mode, frost_protection_active, frost_protection_temperature, heating_power, heating_time_fri1, heating_time_fri2, heating_time_mon1, heating_time_mon2, heating_time_sat1, heating_time_sat2, heating_time_sun1, heating_time_sun2, heating_time_thu1, heating_time_thu2, heating_time_tue1, heating_time_tue2, heating_time_wed1, heating_time_wed2, heating_times_active_for_comfort, on_off, operating_mode, revision, set_back_temperature, target_temperature, temperature_offset)
+> stove_controls(stove_id, room_power_request, bake_temperature, convection_fan1_active, convection_fan1_area, convection_fan1_level, convection_fan2_active, convection_fan2_area, convection_fan2_level, debug0, debug1, debug2, debug3, debug4, eco_mode, frost_protection_active, frost_protection_temperature, heating_power, heating_time_fri1, heating_time_fri2, heating_time_mon1, heating_time_mon2, heating_time_sat1, heating_time_sat2, heating_time_sun1, heating_time_sun2, heating_time_thu1, heating_time_thu2, heating_time_tue1, heating_time_tue2, heating_time_wed1, heating_time_wed2, heating_times_active_for_comfort, on_off, operating_mode, revision, set_back_temperature, target_temperature, temperature_offset)
 Set stove parameters
 
 ### Parameters
@@ -107,7 +45,6 @@ Set stove parameters
 
 Name | Type | Description  | Required | Notes
 ------------- | ------------- | ------------- | ------------- | -------------
-**connect_period_sid** | **String** | Session cookie | [required] |
 **stove_id** | **String** | Stove identifier | [required] |
 **room_power_request** | Option<**i32**> |  |  |
 **bake_temperature** | Option<**String**> |  |  |
@@ -154,7 +91,7 @@ Name | Type | Description  | Required | Notes
 
 ### Authorization
 
-No authorization required
+[cookieAuth](../README.md#cookieAuth)
 
 ### HTTP request headers
 
@@ -166,7 +103,7 @@ No authorization required
 
 ## stove_status
 
-> crate::models::StoveStatus stove_status(connect_period_sid, stove_id)
+> crate::models::StoveStatus stove_status(stove_id)
 Get stove status
 
 ### Parameters
@@ -174,7 +111,6 @@ Get stove status
 
 Name | Type | Description  | Required | Notes
 ------------- | ------------- | ------------- | ------------- | -------------
-**connect_period_sid** | **String** | Session cookie | [required] |
 **stove_id** | **String** | Stove identifier | [required] |
 
 ### Return type
@@ -183,12 +119,12 @@ Name | Type | Description  | Required | Notes
 
 ### Authorization
 
-No authorization required
+[cookieAuth](../README.md#cookieAuth)
 
 ### HTTP request headers
 
 - **Content-Type**: Not defined
-- **Accept**: application/json
+- **Accept**: application/json, text/plain
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 

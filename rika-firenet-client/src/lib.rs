@@ -7,11 +7,9 @@ use regex::Regex;
 use reqwest::{redirect::Policy, Client};
 use reqwest_middleware::{ClientBuilder, Middleware};
 use rika_firenet_openapi::apis::{
+    auth_api::{self, LoginParams, LogoutError},
     configuration::Configuration,
-    stove_api::{
-        self, ListStovesError, ListStovesParams, LoginParams, LogoutError, LogoutParams,
-        StoveStatusError, StoveStatusParams,
-    },
+    stoves_api::{self, ListStovesError, StoveStatusError, StoveStatusParams},
     Error as RikaError,
 };
 pub use rika_firenet_openapi::models::StoveStatus;
@@ -24,9 +22,6 @@ const FIREFOX_USER_AGENT: &str =
     "Mozilla/5.0 (X11; Linux x86_64; rv:110.0) Gecko/20100101 Firefox/110.0";
 
 lazy_static! {
-    static ref STOVELIST_REGEX: Regex =
-        Regex::new(r#"href="/web/stove/(?P<stoveId>[^"]+)""#).unwrap();
-
     static ref PARSE_HEATTIME_REGEC: Regex =
             Regex::new("(?P<firstStartHH>\\d{2})(?P<firstStartMM>\\d{2})(?P<firstEndHH>\\d{2})(?P<firstEndMM>\\d{2})(?P<secondStartHH>\\d{2})(?P<secondStartMM>\\d{2})(?P<secondndHH>\\d{2})(?P<secondEndMM>\\d{2})").unwrap();
 }
@@ -108,8 +103,7 @@ impl RikaFirenetClient {
     }
 
     pub async fn list_stoves(&self) -> Result<Vec<String>, RikaError<ListStovesError>> {
-        let stove_body: String =
-            stove_api::list_stoves(&self.configuration, ListStovesParams::default()).await?;
+        let stove_body: String = stoves_api::list_stoves(&self.configuration).await?;
         debug!("List stoves result: {stove_body}");
         let stove_ids = extract_stove_ids(&stove_body);
         debug!("Extracted stoves ids: {}", stove_ids.join(", "));
@@ -120,18 +114,11 @@ impl RikaFirenetClient {
         &self,
         stove_id: String,
     ) -> Result<StoveStatus, RikaError<StoveStatusError>> {
-        stove_api::stove_status(
-            &self.configuration,
-            StoveStatusParams {
-                connect_period_sid: String::new(),
-                stove_id,
-            },
-        )
-        .await
+        stoves_api::stove_status(&self.configuration, StoveStatusParams { stove_id }).await
     }
 
     pub async fn logout(&self) -> Result<(), RikaError<LogoutError>> {
-        stove_api::logout(&self.configuration, LogoutParams::default()).await
+        auth_api::logout(&self.configuration).await
     }
 }
 

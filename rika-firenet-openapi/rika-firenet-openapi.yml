@@ -7,13 +7,15 @@ info:
 servers:
   - url: https://www.rika-firenet.com
 tags:
-  - name: stove
-    description: Manage your stoves
+  - name: auth
+    description: API authentication
+  - name: stoves
+    description: Manage Rika stoves through Firenet
 paths:
   /web/login:
     post:
       tags:
-        - stove
+        - auth
       summary: Login to Rika Firenet API
       operationId: login
       requestBody:
@@ -55,16 +57,11 @@ paths:
   /web/summary:
     get:
       tags:
-        - stove
+        - stoves
       summary: List available stoves
       operationId: listStoves
-      parameters:
-        - in: cookie
-          name: connect.sid
-          description: Session cookie
-          required: true
-          schema:
-            type: string
+      security:
+        - cookieAuth: []
       responses:
         '200':
           description: Available stoves
@@ -112,16 +109,12 @@ paths:
   /api/client/{stoveId}/status:
     get:
       tags:
-        - stove
+        - stoves
       summary: Get stove status
       operationId: stoveStatus
+      security:
+        - cookieAuth: []
       parameters:
-        - in: cookie
-          name: connect.sid
-          description: Session cookie
-          required: true
-          schema:
-            type: string
         - in: path
           name: stoveId
           description: Stove identifier
@@ -147,9 +140,11 @@ paths:
               schema:
                 type: string
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/StoveStatus'
+                type: string
+                example: Authorisation required!
+
         '500':
           description: |
             The given stove id doesn't belong to the signed-in account.
@@ -161,16 +156,12 @@ paths:
   /api/client/{stoveId}/controls:
     post:
       tags:
-        - stove
+        - stoves
       summary: Set stove parameters
       operationId: stoveControls
+      security:
+        - cookieAuth: []
       parameters:
-        - in: cookie
-          name: connect.sid
-          description: Session cookie
-          required: true
-          schema:
-            type: string
         - in: path
           name: stoveId
           description: Stove identifier
@@ -202,16 +193,11 @@ paths:
   /web/logout:
     get:
       tags:
-        - stove
+        - auth
       summary: Logout from Rika Firenet API
       operationId: logout
-      parameters:
-        - in: cookie
-          name: connect.sid
-          description: Session cookie
-          required: true
-          schema:
-            type: string
+      security:
+        - cookieAuth: []
       responses:
         '302':
           description: Successful logout
@@ -231,6 +217,11 @@ paths:
                 type: string
                 example: Found. Redirecting to /web/login
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: connect.sid 
   schemas:
     StoveStatus:
       type: object

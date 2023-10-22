@@ -3,8 +3,8 @@ use log::debug;
 use reqwest::{Request, Response};
 use reqwest_middleware::{Error, Middleware, Next, Result};
 use rika_firenet_openapi::apis::{
+    auth_api::{self, LoginParams},
     configuration::Configuration,
-    stove_api::{self, LoginParams},
 };
 use task_local_extensions::Extensions;
 
@@ -44,7 +44,7 @@ impl Middleware for RetryWithAuthMiddleware {
 
         if !is_login_or_logout_request(&request) && is_login_redirection(&initial_result) {
             debug!("Login redirect response detected");
-            return match stove_api::login(&self.rika_configuration, self.rika_credentials.clone())
+            return match auth_api::login(&self.rika_configuration, self.rika_credentials.clone())
                 .await
             {
                 Ok(()) => {
