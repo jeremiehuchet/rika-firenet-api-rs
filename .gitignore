@@ -2,3 +2,14 @@ target/
 node_modules/
 **/*.rs.bk
 Cargo.lock
+
+# Devenv
+.devenv*
+devenv.local.nix
+
+# direnv
+.direnv
+
+# pre-commit
+.pre-commit-config.yaml
+

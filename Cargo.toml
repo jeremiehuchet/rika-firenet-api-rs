@@ -1,5 +1,5 @@
 [workspace]
-
+resolver = "2"
 members = [
     "rika-firenet-openapi",
     "rika-firenet-client",
