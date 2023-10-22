@@ -3,6 +3,7 @@ use std::sync::Arc;
 use auth::RetryWithAuthMiddleware;
 use lazy_static::lazy_static;
 use log::debug;
+use nipper::Document;
 use regex::Regex;
 use reqwest::{redirect::Policy, Client};
 use reqwest_middleware::{ClientBuilder, Middleware};
@@ -123,9 +124,16 @@ impl RikaFirenetClient {
 }
 
 fn extract_stove_ids(body: &String) -> Vec<String> {
-    STOVELIST_REGEX
-        .captures_iter(&body)
-        .map(|caps| caps["stoveId"].to_string())
+    let document = Document::from(body);
+    let links = document.select("ul#stoveList li a");
+    links
+        .iter()
+        .filter_map(|link| link.attr("href"))
+        .map(|href| href.to_string())
+        .filter_map(|href| {
+            href.strip_prefix("/web/stove/")
+                .map(|stove_id| stove_id.to_string())
+        })
         .collect()
 }
 
