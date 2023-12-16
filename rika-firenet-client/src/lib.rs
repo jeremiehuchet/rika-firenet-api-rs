@@ -3,6 +3,7 @@ use std::sync::Arc;
 use auth::RetryWithAuthMiddleware;
 use lazy_static::lazy_static;
 use log::debug;
+use model::StatusDetail;
 use nipper::Document;
 use regex::Regex;
 use reqwest::{redirect::Policy, Client};
@@ -16,7 +17,7 @@ use rika_firenet_openapi::apis::{
 pub use rika_firenet_openapi::models::StoveStatus;
 
 mod auth;
-mod model;
+pub mod model;
 
 const API_BASE_URL: &str = "https://www.rika-firenet.com";
 const FIREFOX_USER_AGENT: &str =
@@ -137,9 +138,84 @@ fn extract_stove_ids(body: &String) -> Vec<String> {
         .collect()
 }
 
+pub trait HasDetailledStatus {
+    fn get_status_details(&self) -> StatusDetail;
+}
+
+impl HasDetailledStatus for StoveStatus {
+    fn get_status_details(&self) -> StatusDetail {
+        let frost_started = self.sensors.status_frost_started;
+        let main_state = self.sensors.status_main_state;
+        let sub_state = self.sensors.status_sub_state;
+        let bake_mode = self.controls.operating_mode.unwrap_or_default() == 3
+            && "1024" != self.controls.bake_temperature.clone().unwrap_or_default()
+            && "1024" != self.sensors.input_bake_temperature;
+        let temp_diff = self
+            .sensors
+            .input_bake_temperature
+            .parse::<i32>()
+            .unwrap()
+            .abs_diff(
+                self.controls
+                    .bake_temperature
+                    .clone()
+                    .unwrap_or_default()
+                    .parse::<i32>()
+                    .unwrap(),
+            );
+
+        if frost_started {
+            return StatusDetail::FrostProtection;
+        }
+        if main_state == 1 {
+            if sub_state == 0 {
+                return StatusDetail::Off;
+            } else if sub_state == 1 {
+                return StatusDetail::Standby;
+            } else if sub_state == 2 {
+                return StatusDetail::ExternalRequest;
+            } else if sub_state == 3 {
+                return StatusDetail::Standby;
+            }
+            return StatusDetail::Unknown;
+        } else if main_state == 2 {
+            return StatusDetail::Ignition;
+        } else if main_state == 3 {
+            return StatusDetail::Startup;
+        } else if main_state == 4 {
+            if bake_mode && temp_diff < 10 {
+                return StatusDetail::Bake;
+            } else if bake_mode {
+                return StatusDetail::Heat;
+            } else {
+                return StatusDetail::Control;
+            }
+        } else if main_state == 5 {
+            if sub_state == 3 || sub_state == 4 {
+                return StatusDetail::DeepCleaning;
+            } else {
+                return StatusDetail::Cleaning;
+            }
+        } else if main_state == 6 {
+            return StatusDetail::Burnout;
+        } else if main_state == 11
+            || main_state == 13
+            || main_state == 14
+            || main_state == 16
+            || main_state == 17
+            || main_state == 50
+        {
+            return StatusDetail::WoodPresenceControl;
+        } else if main_state == 20 || main_state == 21 {
+            return StatusDetail::Wood;
+        }
+        return StatusDetail::Unknown;
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{extract_stove_ids, RikaFirenetClient};
+    use crate::{extract_stove_ids, model::StatusDetail, HasDetailledStatus, RikaFirenetClient};
     use httpmock::{Method::GET, MockServer};
 
     const PARTIAL_SUMMARY_EXAMPLE: &str = r#"
@@ -208,6 +284,30 @@ mod tests {
         assert_eq!(
             status.sensors.input_room_temperature, "19.6",
             "sensor value"
+        );
+        status_mock.assert();
+    }
+
+    #[tokio::test]
+    async fn can_get_stove_detailed_status() {
+        let server = MockServer::start();
+        let status_mock = server.mock(|when, then| {
+            when.method(GET).path("/api/client/12345/status");
+            then.status(200)
+                .body_from_file("../mock/src/stove-status.json");
+        });
+
+        let client = RikaFirenetClient::builder()
+            .base_url(server.base_url())
+            .credentials("someone@rika.com", "Secret!")
+            .build();
+
+        let status = client.status("12345".to_string()).await.unwrap();
+
+        assert_eq!(
+            status.get_status_details(),
+            StatusDetail::Standby,
+            "stove status details"
         );
         status_mock.assert();
     }

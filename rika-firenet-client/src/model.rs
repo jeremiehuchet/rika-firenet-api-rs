@@ -2,6 +2,25 @@ use std::{num::ParseIntError, str::FromStr};
 
 use rika_firenet_openapi::models::StoveStatus;
 
+#[derive(PartialEq, Eq, Debug)]
+pub enum StatusDetail {
+    Bake,
+    Burnout,
+    Cleaning,
+    Control,
+    DeepCleaning,
+    ExternalRequest,
+    FrostProtection,
+    Heat,
+    Ignition,
+    Off,
+    Standby,
+    Startup,
+    Unknown,
+    Wood,
+    WoodPresenceControl,
+}
+
 pub enum StoveControl {
     OperatingMode(OperatingMode),
     HeatingPower(i32),
