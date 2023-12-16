@@ -15,6 +15,12 @@
 
   pre-commit.hooks.rustfmt.enable = true;
 
+  scripts.docker-build-mock.exec = ''
+    docker build \
+        --file $DEVENV_ROOT/mock/Dockerfile \
+        --tag rika-firenet-api-mock:latest \
+        $DEVENV_ROOT/mock
+  '';
   scripts.openapi-generate.exec = ''
     openapi-generator-cli generate \
         -g rust \
