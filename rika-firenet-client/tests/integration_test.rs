@@ -61,7 +61,7 @@ async fn assert_mock_count<'d>(
 
 #[tokio::test]
 async fn should_sucessfully_auto_login() {
-    let docker = clients::Cli::docker();
+    let docker = clients::Cli::default();
     let container = docker.run(RikaMock::default());
     let client = client_for(&container)
         .credentials("registered-user@rika-firenet.com", "Secret")
@@ -72,7 +72,7 @@ async fn should_sucessfully_auto_login() {
 
 #[tokio::test]
 async fn can_list_stoves() {
-    let docker = clients::Cli::docker();
+    let docker = clients::Cli::default();
     let container = docker.run(RikaMock::default());
     let client = client_for(&container)
         .credentials("registered-user@rika-firenet.com", "Secret")
@@ -84,7 +84,7 @@ async fn can_list_stoves() {
 
 #[tokio::test]
 async fn can_list_stoves_multiple_times_with_one_single_authentication() {
-    let docker = clients::Cli::docker();
+    let docker = clients::Cli::default();
     let container = docker.run(RikaMock::default());
     let client = client_for(&container)
         .credentials("registered-user@rika-firenet.com", "Secret")
@@ -102,7 +102,7 @@ async fn can_list_stoves_multiple_times_with_one_single_authentication() {
 
 #[tokio::test]
 async fn cant_list_stoves_with_invalid_credentials() {
-    let docker = clients::Cli::docker();
+    let docker = clients::Cli::default();
     let container = docker.run(RikaMock::default());
     let client = client_for(&container)
         .credentials("unknown-user@rika-firenet.com", "InvalidSecret")
@@ -114,7 +114,7 @@ async fn cant_list_stoves_with_invalid_credentials() {
 
 #[tokio::test]
 async fn can_get_stove_status() {
-    let docker = clients::Cli::docker();
+    let docker = clients::Cli::default();
     let container = docker.run(RikaMock::default());
     let client = client_for(&container)
         .credentials("registered-user@rika-firenet.com", "Secret")
@@ -130,7 +130,7 @@ async fn can_get_stove_status() {
 
 #[tokio::test]
 async fn can_log_out() {
-    let docker = clients::Cli::docker();
+    let docker = clients::Cli::default();
     let container = docker.run(RikaMock::default());
     assert_mock_count("logout-count", 0, &container).await;
 
