@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use http::Extensions;
 use log::debug;
 use reqwest::{Request, Response};
 use reqwest_middleware::{Error, Middleware, Next, Result};
@@ -6,7 +7,6 @@ use rika_firenet_openapi::apis::{
     auth_api::{self, LoginParams},
     configuration::Configuration,
 };
-use task_local_extensions::Extensions;
 
 pub(crate) struct RetryWithAuthMiddleware {
     rika_configuration: Configuration,
