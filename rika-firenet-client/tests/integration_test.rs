@@ -1,5 +1,5 @@
 use reqwest::Client;
-use rika_firenet_client::{RikaFirenetClient, RikaFirenetClientBuilder};
+use rika_firenet_client::{Mode, RikaFirenetClient, RikaFirenetClientBuilder};
 use testcontainers::{
     clients::{self},
     core::WaitFor,
@@ -146,4 +146,42 @@ async fn can_log_out() {
     client.logout().await.unwrap();
 
     assert_mock_count("logout-count", 2, &container).await;
+}
+
+#[tokio::test]
+async fn can_update_settings() {
+    let docker = clients::Cli::default();
+    let container = docker.run(RikaMock::default());
+
+    let client = client_for(&container)
+        .credentials("registered-user@rika-firenet.com", "Secret")
+        .build();
+
+    let stove = client.status("12345".to_string()).await.unwrap();
+    assert_eq!(
+        stove.controls.operating_mode,
+        Some(2),
+        "comfort operating mode"
+    );
+    assert_eq!(stove.controls.target_temperature, Some("20".to_string()));
+    assert_eq!(stove.controls.heating_power, Some(50));
+
+    client
+        .configure_mode(
+            "12345".to_string(),
+            Mode::Manual {
+                heating_power_percent: 75,
+            },
+        )
+        .await
+        .unwrap();
+
+    let stove = client.status("12345".to_string()).await.unwrap();
+    assert_eq!(
+        stove.controls.operating_mode,
+        Some(0),
+        "manual operating mode"
+    );
+    assert_eq!(stove.controls.target_temperature, Some("20".to_string()));
+    assert_eq!(stove.controls.heating_power, Some(75));
 }

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use anyhow::Result;
 use auth::RetryWithAuthMiddleware;
 use lazy_static::lazy_static;
 use log::debug;
@@ -11,8 +12,7 @@ use reqwest_middleware::{ClientBuilder, Middleware};
 use rika_firenet_openapi::apis::{
     auth_api::{self, LoginParams, LogoutError},
     configuration::Configuration,
-    stoves_api::{self, ListStovesError, StoveStatusError, StoveStatusParams},
-    Error as RikaError,
+    stoves_api::{self, StoveControlsParams, StoveStatusParams},
 };
 pub use rika_firenet_openapi::models::StoveStatus;
 
@@ -104,7 +104,7 @@ impl RikaFirenetClient {
         RikaFirenetClientBuilder::default()
     }
 
-    pub async fn list_stoves(&self) -> Result<Vec<String>, RikaError<ListStovesError>> {
+    pub async fn list_stoves(&self) -> Result<Vec<String>> {
         let stove_body: String = stoves_api::list_stoves(&self.configuration).await?;
         debug!("List stoves result: {stove_body}");
         let stove_ids = extract_stove_ids(&stove_body);
@@ -112,15 +112,36 @@ impl RikaFirenetClient {
         Ok(stove_ids)
     }
 
-    pub async fn status(
-        &self,
-        stove_id: String,
-    ) -> Result<StoveStatus, RikaError<StoveStatusError>> {
-        stoves_api::stove_status(&self.configuration, StoveStatusParams { stove_id }).await
+    pub async fn status(&self, stove_id: String) -> Result<StoveStatus> {
+        Ok(stoves_api::stove_status(&self.configuration, StoveStatusParams { stove_id }).await?)
     }
 
-    pub async fn logout(&self) -> Result<(), RikaError<LogoutError>> {
-        auth_api::logout(&self.configuration).await
+    pub async fn configure_mode(&self, stove_id: String, mode: Mode) -> Result<()> {
+        let status = self.status(stove_id).await?;
+        let mut params = build_control_params(status);
+        match mode {
+            Mode::Manual {
+                heating_power_percent,
+            } => {
+                params.operating_mode = Some(0);
+                params.heating_power = Some(heating_power_percent.into());
+            }
+            Mode::Auto {
+                heating_power_percent,
+            } => {
+                params.operating_mode = Some(1);
+                params.heating_power = Some(heating_power_percent.into());
+            }
+            Mode::Comfort { target_temperature } => {
+                params.operating_mode = Some(2);
+                params.target_temperature = Some(format!("{target_temperature}"));
+            }
+        }
+        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+    }
+
+    pub async fn logout(&self) -> Result<()> {
+        Ok(auth_api::logout(&self.configuration).await?)
     }
 }
 
@@ -136,6 +157,56 @@ fn extract_stove_ids(body: &String) -> Vec<String> {
                 .map(|stove_id| stove_id.to_string())
         })
         .collect()
+}
+
+pub enum Mode {
+    Manual { heating_power_percent: u8 },
+    Auto { heating_power_percent: u8 },
+    Comfort { target_temperature: u8 },
+}
+
+fn build_control_params(status: StoveStatus) -> StoveControlsParams {
+    StoveControlsParams {
+        stove_id: status.stove_id,
+        room_power_request: status.controls.room_power_request,
+        bake_temperature: status.controls.bake_temperature,
+        convection_fan1_active: status.controls.convection_fan1_active,
+        convection_fan1_area: status.controls.convection_fan1_area,
+        convection_fan1_level: status.controls.convection_fan1_level,
+        convection_fan2_active: status.controls.convection_fan2_active,
+        convection_fan2_area: status.controls.convection_fan2_area,
+        convection_fan2_level: status.controls.convection_fan2_level,
+        debug0: status.controls.debug0,
+        debug1: status.controls.debug1,
+        debug2: status.controls.debug2,
+        debug3: status.controls.debug3,
+        debug4: status.controls.debug4,
+        eco_mode: status.controls.eco_mode,
+        frost_protection_active: status.controls.frost_protection_active,
+        frost_protection_temperature: status.controls.frost_protection_temperature,
+        heating_power: status.controls.heating_power,
+        heating_time_fri1: status.controls.heating_time_fri1,
+        heating_time_fri2: status.controls.heating_time_fri2,
+        heating_time_mon1: status.controls.heating_time_mon1,
+        heating_time_mon2: status.controls.heating_time_mon2,
+        heating_time_sat1: status.controls.heating_time_sat1,
+        heating_time_sat2: status.controls.heating_time_sat2,
+        heating_time_sun1: status.controls.heating_time_sun1,
+        heating_time_sun2: status.controls.heating_time_sun2,
+        heating_time_thu1: status.controls.heating_time_thu1,
+        heating_time_thu2: status.controls.heating_time_thu2,
+        heating_time_tue1: status.controls.heating_time_tue1,
+        heating_time_tue2: status.controls.heating_time_tue2,
+        heating_time_wed1: status.controls.heating_time_wed1,
+        heating_time_wed2: status.controls.heating_time_wed2,
+        heating_times_active_for_comfort: status.controls.heating_times_active_for_comfort,
+        on_off: status.controls.on_off,
+        operating_mode: status.controls.operating_mode,
+        revision: Some(status.last_confirmed_revision),
+        set_back_temperature: status.controls.set_back_temperature,
+        target_temperature: status.controls.target_temperature,
+        temperature_offset: status.controls.temperature_offset,
+    }
 }
 
 pub trait HasDetailledStatus {
@@ -215,8 +286,14 @@ impl HasDetailledStatus for StoveStatus {
 
 #[cfg(test)]
 mod tests {
-    use crate::{extract_stove_ids, model::StatusDetail, HasDetailledStatus, RikaFirenetClient};
-    use httpmock::{Method::GET, MockServer};
+    use crate::{
+        extract_stove_ids, model::StatusDetail, HasDetailledStatus, Mode, RikaFirenetClient,
+    };
+    use httpmock::{
+        Method::{GET, POST},
+        MockServer,
+    };
+    use regex::Regex;
 
     const PARTIAL_SUMMARY_EXAMPLE: &str = r#"
     <div role="main" class="ui-content">
@@ -310,6 +387,114 @@ mod tests {
             "stove status details"
         );
         status_mock.assert();
+    }
+
+    #[tokio::test]
+    async fn can_set_stove_mode_to_manual() {
+        let server = MockServer::start();
+        let status_mock = server.mock(|when, then| {
+            when.method(GET).path("/api/client/__stove_id__/status");
+            then.status(200)
+                .body_from_file("../mock/src/stove-status.json");
+        });
+        let control_mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/client/__stove_id__/controls")
+                .body_contains("&revision=1572181181&")
+                .body_contains("&operatingMode=0&")
+                .body_contains("&heatingPower=51&");
+            then.status(200).body("OK");
+        });
+
+        let client = RikaFirenetClient::builder()
+            .base_url(server.base_url())
+            .credentials("someone@rika.com", "Secret!")
+            .build();
+
+        let result = client
+            .configure_mode(
+                "__stove_id__".to_string(),
+                Mode::Manual {
+                    heating_power_percent: 51,
+                },
+            )
+            .await;
+
+        status_mock.assert();
+        control_mock.assert();
+        result.unwrap();
+    }
+
+    #[tokio::test]
+    async fn can_set_stove_mode_to_automatic() {
+        let server = MockServer::start();
+        let status_mock = server.mock(|when, then| {
+            when.method(GET).path("/api/client/__stove_id__/status");
+            then.status(200)
+                .body_from_file("../mock/src/stove-status.json");
+        });
+        let control_mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/client/__stove_id__/controls")
+                .body_contains("&revision=1572181181&")
+                .body_contains("&operatingMode=1&")
+                .body_contains("&heatingPower=52&");
+            then.status(200).body("OK");
+        });
+
+        let client = RikaFirenetClient::builder()
+            .base_url(server.base_url())
+            .credentials("someone@rika.com", "Secret!")
+            .build();
+
+        let result = client
+            .configure_mode(
+                "__stove_id__".to_string(),
+                Mode::Auto {
+                    heating_power_percent: 52,
+                },
+            )
+            .await;
+
+        status_mock.assert();
+        control_mock.assert();
+        result.unwrap();
+    }
+
+    #[tokio::test]
+    async fn can_set_stove_mode_to_comfort() {
+        let server = MockServer::start();
+        let status_mock = server.mock(|when, then| {
+            when.method(GET).path("/api/client/__stove_id__/status");
+            then.status(200)
+                .body_from_file("../mock/src/stove-status.json");
+        });
+        let control_mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/client/__stove_id__/controls")
+                .body_matches(Regex::new("^|&revision=1572181181&|$").unwrap())
+                .body_matches(Regex::new("^|&operatingMode=2&|$").unwrap())
+                .body_matches(Regex::new("^|&targetTemperature=19&|$").unwrap());
+            then.status(200).body("OK");
+        });
+
+        let client = RikaFirenetClient::builder()
+            .base_url(server.base_url())
+            .credentials("someone@rika.com", "Secret!")
+            .build();
+
+        let result = client
+            .configure_mode(
+                "__stove_id__".to_string(),
+                Mode::Comfort {
+                    target_temperature: 19,
+                },
+            )
+            .await;
+
+        status_mock.assert();
+        control_mock.assert();
+        result.unwrap();
     }
 
     #[tokio::test]

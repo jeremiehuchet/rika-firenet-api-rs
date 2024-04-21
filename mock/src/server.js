@@ -42,6 +42,10 @@ app.post('/web/login', (req, res) => {
   const password = req.body.password
   if (email === 'registered-user@rika-firenet.com' || password === 'Secret') {
     req.session.user = email
+    req.session.stoves = {
+      12345: readStoveStatusTemplate('12345'),
+      333444: readStoveStatusTemplate('333444'),
+    };
     res.body = 'Found. Redirecting to /web/summary'
     res.redirect("/web/summary")
   } else {
@@ -49,6 +53,12 @@ app.post('/web/login', (req, res) => {
     res.redirect("/web/login")
   }
 })
+
+function readStoveStatusTemplate(stoveId) {
+  const text = fs.readFileSync('stove-status.json', 'utf8')
+    .replaceAll('__stove_id__', stoveId);
+  return JSON.parse(text)
+}
 
 app.get('/web/logout', (req, res) => {
   global.logoutCount++
@@ -74,10 +84,27 @@ app.get('/api/client/:stoveId/status', (req, res) => {
   if (!req.session.user) {
     res.body = 'Authorisation required!'
     res.sendStatus(401)
-  } else if (['12345', '333444'].includes(stoveId)) {
-    const stoveStatusBody = fs.readFileSync('stove-status.json', 'utf8')
-      .replaceAll('__stove_id__', stoveId)
-    res.send(stoveStatusBody)
+  } else if (req.session.stoves[stoveId]) {
+    res.send(req.session.stoves[stoveId]);
+  } else {
+    res.body = `Stove ${stoveId} is not registered for user ${req.session.user}`
+    res.sendStatus(500)
+  }
+})
+
+app.post('/api/client/:stoveId/controls', (req, res) => {
+  const stoveId = req.params.stoveId
+  if (!req.session.user) {
+    res.body = 'Authorisation required!'
+    res.sendStatus(401)
+  } else if (req.session.stoves[stoveId]) {
+    req.session.stoves[stoveId].controls = {
+      ...req.session.stoves[stoveId].controls,
+      ...req.body.operatingMode ?{operatingMode: Number.parseInt(req.body.operatingMode)}:{},
+      ...req.body.heatingPower?{heatingPower: Number.parseInt(req.body.heatingPower)}:{},
+      ...req.body.targetTemperature?{targetTemperature: req.body.targetTemperature}:{},
+    }
+    res.send('OK');
   } else {
     res.body = `Stove ${stoveId} is not registered for user ${req.session.user}`
     res.sendStatus(500)
