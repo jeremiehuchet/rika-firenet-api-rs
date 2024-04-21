@@ -103,7 +103,7 @@ Name | Type | Description  | Required | Notes
 
 ## stove_status
 
-> crate::models::StoveStatus stove_status(stove_id)
+> models::StoveStatus stove_status(stove_id)
 Get stove status
 
 ### Parameters
@@ -115,7 +115,7 @@ Name | Type | Description  | Required | Notes
 
 ### Return type
 
-[**crate::models::StoveStatus**](StoveStatus.md)
+[**models::StoveStatus**](StoveStatus.md)
 
 ### Authorization
 

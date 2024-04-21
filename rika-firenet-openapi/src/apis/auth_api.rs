@@ -11,7 +11,7 @@
 use reqwest;
 
 use super::{configuration, Error};
-use crate::apis::ResponseContent;
+use crate::{apis::ResponseContent, models};
 
 /// struct for passing parameters to the method [`login`]
 #[derive(Clone, Debug)]

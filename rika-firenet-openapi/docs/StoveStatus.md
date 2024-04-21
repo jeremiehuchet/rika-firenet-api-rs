@@ -10,9 +10,9 @@ Name | Type | Description | Notes
 **stove_type** | **String** | Model name | 
 **last_confirmed_revision** | **i32** |  | 
 **last_seen_minutes** | **i32** |  | 
-**controls** | [**crate::models::StoveControls**](StoveControls.md) |  | 
-**sensors** | [**crate::models::StoveSensors**](StoveSensors.md) |  | 
-**stove_features** | [**crate::models::StoveFeatures**](StoveFeatures.md) |  | 
+**controls** | [**models::StoveControls**](StoveControls.md) |  | 
+**sensors** | [**models::StoveSensors**](StoveSensors.md) |  | 
+**stove_features** | [**models::StoveFeatures**](StoveFeatures.md) |  | 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

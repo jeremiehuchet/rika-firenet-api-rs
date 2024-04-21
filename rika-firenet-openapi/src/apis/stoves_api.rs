@@ -11,7 +11,7 @@
 use reqwest;
 
 use super::{configuration, Error};
-use crate::apis::ResponseContent;
+use crate::{apis::ResponseContent, models};
 
 /// struct for passing parameters to the method [`stove_controls`]
 #[derive(Clone, Debug)]
@@ -334,7 +334,7 @@ pub async fn stove_controls(
 pub async fn stove_status(
     configuration: &configuration::Configuration,
     params: StoveStatusParams,
-) -> Result<crate::models::StoveStatus, Error<StoveStatusError>> {
+) -> Result<models::StoveStatus, Error<StoveStatusError>> {
     let local_var_configuration = configuration;
 
     // unbox the parameters
