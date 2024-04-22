@@ -1,20 +1,23 @@
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use auth::RetryWithAuthMiddleware;
 use lazy_static::lazy_static;
 use log::debug;
-use model::StatusDetail;
+use model::{HeatingSchedule, OperatingMode, StatusDetail};
 use nipper::Document;
 use regex::Regex;
 use reqwest::{redirect::Policy, Client};
 use reqwest_middleware::{ClientBuilder, Middleware};
-use rika_firenet_openapi::apis::{
-    auth_api::{self, LoginParams, LogoutError},
-    configuration::Configuration,
-    stoves_api::{self, StoveControlsParams, StoveStatusParams},
-};
 pub use rika_firenet_openapi::models::StoveStatus;
+use rika_firenet_openapi::{
+    apis::{
+        auth_api::{self, LoginParams},
+        configuration::Configuration,
+        stoves_api::{self, StoveControlsParams, StoveStatusParams},
+    },
+    models::StoveControls,
+};
 
 mod auth;
 pub mod model;
@@ -116,28 +119,133 @@ impl RikaFirenetClient {
         Ok(stoves_api::stove_status(&self.configuration, StoveStatusParams { stove_id }).await?)
     }
 
-    pub async fn configure_mode(&self, stove_id: String, mode: Mode) -> Result<()> {
-        let status = self.status(stove_id).await?;
-        let mut params = build_control_params(status);
-        match mode {
-            Mode::Manual {
-                heating_power_percent,
-            } => {
-                params.operating_mode = Some(0);
-                params.heating_power = Some(heating_power_percent.into());
-            }
-            Mode::Auto {
-                heating_power_percent,
-            } => {
-                params.operating_mode = Some(1);
-                params.heating_power = Some(heating_power_percent.into());
-            }
-            Mode::Comfort { target_temperature } => {
-                params.operating_mode = Some(2);
-                params.target_temperature = Some(format!("{target_temperature}"));
-            }
-        }
+    pub async fn restore_controls(&self, stove_id: String, controls: StoveControls) -> Result<()> {
+        let current_status = self.status(stove_id).await?;
+        let restore_status = StoveStatus {
+            controls: Box::new(controls),
+            ..current_status
+        };
+        let params = into_controls(restore_status);
         Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+    }
+
+    pub async fn turn_on(&self, stove_id: String) -> Result<()> {
+        let params = StoveControlsParams {
+            on_off: Some(true),
+            ..self.current_controls(stove_id).await?
+        };
+        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+    }
+
+    pub async fn turn_off(&self, stove_id: String) -> Result<()> {
+        let params = StoveControlsParams {
+            on_off: Some(false),
+            ..self.current_controls(stove_id).await?
+        };
+        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+    }
+
+    pub async fn set_manual_mode(&self, stove_id: String, heating_power_percent: u8) -> Result<()> {
+        ensure!(
+            (0..100).contains(&heating_power_percent),
+            "Heating power must be 0 <= power <= 100 but it was {heating_power_percent}"
+        );
+        let params = StoveControlsParams {
+            operating_mode: Some(OperatingMode::Manual.into()),
+            heating_power: Some(heating_power_percent.into()),
+            ..self.current_controls(stove_id).await?
+        };
+        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+    }
+
+    pub async fn set_auto_mode(&self, stove_id: String, heating_power_percent: u8) -> Result<()> {
+        ensure!(
+            (0..100).contains(&heating_power_percent),
+            "Heating power must be 0 <= power <= 100 but it was {heating_power_percent}"
+        );
+        let params = StoveControlsParams {
+            operating_mode: Some(OperatingMode::Auto.into()),
+            heating_power: Some(heating_power_percent.into()),
+            ..self.current_controls(stove_id).await?
+        };
+        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+    }
+
+    pub async fn set_comfort_mode(
+        &self,
+        stove_id: String,
+        idle_temperature: u8,
+        target_temperature: u8,
+    ) -> Result<()> {
+        ensure!(
+            (12..21).contains(&idle_temperature),
+            "Idle temperature must be 12 <= temp <= 20°C but it was {idle_temperature}"
+        );
+        ensure!(
+            (14..29).contains(&target_temperature),
+            "Target temperature must be 14 <= temp <= 28°C but it was {target_temperature}"
+        );
+        ensure!(
+            idle_temperature < target_temperature,
+            "Target temperature must be greater than idle temperature"
+        );
+        let params = StoveControlsParams {
+            operating_mode: Some(OperatingMode::Comfort.into()),
+            target_temperature: Some(target_temperature.to_string()),
+            set_back_temperature: Some(idle_temperature.to_string()),
+            ..self.current_controls(stove_id).await?
+        };
+        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+    }
+
+    pub async fn enable_frost_protection(
+        &self,
+        stove_id: String,
+        frost_protection_temperature: u8,
+    ) -> Result<()> {
+        ensure!((4..10).contains(&frost_protection_temperature), "Frost protection temperature must be 4 <= temp <= 10°C but it was {frost_protection_temperature}");
+        let params = StoveControlsParams {
+            frost_protection_active: Some(true),
+            frost_protection_temperature: Some(frost_protection_temperature.to_string()),
+            ..self.current_controls(stove_id).await?
+        };
+        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+    }
+
+    pub async fn disable_frost_protection(&self, stove_id: String) -> Result<()> {
+        let params = StoveControlsParams {
+            frost_protection_active: Some(false),
+            ..self.current_controls(stove_id).await?
+        };
+        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+    }
+
+    pub async fn enable_schedule(&self, stove_id: String, schedule: HeatingSchedule) -> Result<()> {
+        let params = StoveControlsParams {
+            heating_times_active_for_comfort: Some(true),
+            heating_time_mon1: Some(schedule.monday.first.into()),
+            heating_time_mon2: Some(schedule.monday.second.into()),
+            heating_time_tue1: Some(schedule.tuesday.first.into()),
+            heating_time_tue2: Some(schedule.tuesday.second.into()),
+            heating_time_wed1: Some(schedule.wednesday.first.into()),
+            heating_time_wed2: Some(schedule.wednesday.second.into()),
+            heating_time_thu1: Some(schedule.thursday.first.into()),
+            heating_time_thu2: Some(schedule.thursday.second.into()),
+            heating_time_fri1: Some(schedule.friday.first.into()),
+            heating_time_fri2: Some(schedule.friday.second.into()),
+            heating_time_sat1: Some(schedule.saturday.first.into()),
+            heating_time_sat2: Some(schedule.saturday.second.into()),
+            heating_time_sun1: Some(schedule.sunday.first.into()),
+            heating_time_sun2: Some(schedule.sunday.second.into()),
+            ..self.current_controls(stove_id).await?
+        };
+        println!("{params:?}");
+        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+    }
+
+    async fn current_controls(&self, stove_id: String) -> Result<StoveControlsParams> {
+        let status = self.status(stove_id).await?;
+        Ok(into_controls(status))
     }
 
     pub async fn logout(&self) -> Result<()> {
@@ -159,13 +267,7 @@ fn extract_stove_ids(body: &String) -> Vec<String> {
         .collect()
 }
 
-pub enum Mode {
-    Manual { heating_power_percent: u8 },
-    Auto { heating_power_percent: u8 },
-    Comfort { target_temperature: u8 },
-}
-
-fn build_control_params(status: StoveStatus) -> StoveControlsParams {
+fn into_controls(status: StoveStatus) -> StoveControlsParams {
     StoveControlsParams {
         stove_id: status.stove_id,
         room_power_request: status.controls.room_power_request,
@@ -211,6 +313,7 @@ fn build_control_params(status: StoveStatus) -> StoveControlsParams {
 
 pub trait HasDetailledStatus {
     fn get_status_details(&self) -> StatusDetail;
+    fn get_heating_schedule(&self) -> HeatingSchedule;
 }
 
 impl HasDetailledStatus for StoveStatus {
@@ -282,12 +385,18 @@ impl HasDetailledStatus for StoveStatus {
         }
         return StatusDetail::Unknown;
     }
+
+    fn get_heating_schedule(&self) -> HeatingSchedule {
+        HeatingSchedule::from(self.controls.as_ref().clone())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        extract_stove_ids, model::StatusDetail, HasDetailledStatus, Mode, RikaFirenetClient,
+        extract_stove_ids,
+        model::{DailySchedule, HeatingSchedule, StatusDetail},
+        HasDetailledStatus, RikaFirenetClient,
     };
     use httpmock::{
         Method::{GET, POST},
@@ -334,7 +443,7 @@ mod tests {
             .credentials("someone@rika.com", "Secret!")
             .build();
 
-        let stoves = client.list_stoves().await.unwrap();
+        let stoves = client.list_stoves().await.expect("a successful operation");
 
         assert_eq!(stoves, vec!["12345", "333444"], "expect 2 stoves ids");
         summary_mock.assert();
@@ -354,7 +463,10 @@ mod tests {
             .credentials("someone@rika.com", "Secret!")
             .build();
 
-        let status = client.status("12345".to_string()).await.unwrap();
+        let status = client
+            .status("12345".to_string())
+            .await
+            .expect("a successful operation");
 
         assert_eq!(status.stove_id, "__stove_id__", "stove id");
         assert_eq!(status.name, "Stove __stove_id__", "stove name");
@@ -379,7 +491,10 @@ mod tests {
             .credentials("someone@rika.com", "Secret!")
             .build();
 
-        let status = client.status("12345".to_string()).await.unwrap();
+        let status = client
+            .status("12345".to_string())
+            .await
+            .expect("a successful operation");
 
         assert_eq!(
             status.get_status_details(),
@@ -387,6 +502,66 @@ mod tests {
             "stove status details"
         );
         status_mock.assert();
+    }
+
+    #[tokio::test]
+    async fn can_turn_on_stove() {
+        let server = MockServer::start();
+        let status_mock = server.mock(|when, then| {
+            when.method(GET).path("/api/client/__stove_id__/status");
+            then.status(200)
+                .body_from_file("../mock/src/stove-status.json");
+        });
+        let control_mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/client/__stove_id__/controls")
+                .body_matches(Regex::new("(^|&)revision=1572181181(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)onOff=true(&|$)").unwrap());
+            then.status(200).body("OK");
+        });
+
+        let client = RikaFirenetClient::builder()
+            .base_url(server.base_url())
+            .credentials("someone@rika.com", "Secret!")
+            .build();
+
+        client
+            .turn_on("__stove_id__".to_string())
+            .await
+            .expect("a successful operation");
+
+        status_mock.assert();
+        control_mock.assert();
+    }
+
+    #[tokio::test]
+    async fn can_turn_off_stove() {
+        let server = MockServer::start();
+        let status_mock = server.mock(|when, then| {
+            when.method(GET).path("/api/client/__stove_id__/status");
+            then.status(200)
+                .body_from_file("../mock/src/stove-status.json");
+        });
+        let control_mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/client/__stove_id__/controls")
+                .body_matches(Regex::new("(^|&)revision=1572181181(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)onOff=false(&|$)").unwrap());
+            then.status(200).body("OK");
+        });
+
+        let client = RikaFirenetClient::builder()
+            .base_url(server.base_url())
+            .credentials("someone@rika.com", "Secret!")
+            .build();
+
+        client
+            .turn_off("__stove_id__".to_string())
+            .await
+            .expect("a successful operation");
+
+        status_mock.assert();
+        control_mock.assert();
     }
 
     #[tokio::test]
@@ -400,9 +575,9 @@ mod tests {
         let control_mock = server.mock(|when, then| {
             when.method(POST)
                 .path("/api/client/__stove_id__/controls")
-                .body_contains("&revision=1572181181&")
-                .body_contains("&operatingMode=0&")
-                .body_contains("&heatingPower=51&");
+                .body_matches(Regex::new("(^|&)revision=1572181181(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)operatingMode=0(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)heatingPower=51(&|$)").unwrap());
             then.status(200).body("OK");
         });
 
@@ -411,18 +586,31 @@ mod tests {
             .credentials("someone@rika.com", "Secret!")
             .build();
 
-        let result = client
-            .configure_mode(
-                "__stove_id__".to_string(),
-                Mode::Manual {
-                    heating_power_percent: 51,
-                },
-            )
-            .await;
+        client
+            .set_manual_mode("__stove_id__".to_string(), 51)
+            .await
+            .expect("a successful operation");
 
         status_mock.assert();
         control_mock.assert();
-        result.unwrap();
+    }
+
+    #[tokio::test]
+    async fn cant_set_stove_mode_to_manual_with_an_invalid_power_heating_value() {
+        let client = RikaFirenetClient::builder()
+            .base_url("http://localhost")
+            .credentials("someone@rika.com", "Secret!")
+            .build();
+
+        let error = client
+            .set_manual_mode("__stove_id__".to_string(), 101)
+            .await
+            .unwrap_err();
+        let root_cause = error.root_cause();
+        assert_eq!(
+            format!("{root_cause}"),
+            "Heating power must be 0 <= power <= 100 but it was 101"
+        );
     }
 
     #[tokio::test]
@@ -436,9 +624,9 @@ mod tests {
         let control_mock = server.mock(|when, then| {
             when.method(POST)
                 .path("/api/client/__stove_id__/controls")
-                .body_contains("&revision=1572181181&")
-                .body_contains("&operatingMode=1&")
-                .body_contains("&heatingPower=52&");
+                .body_matches(Regex::new("(^|&)revision=1572181181(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)operatingMode=1(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)heatingPower=52(&|$)").unwrap());
             then.status(200).body("OK");
         });
 
@@ -447,18 +635,31 @@ mod tests {
             .credentials("someone@rika.com", "Secret!")
             .build();
 
-        let result = client
-            .configure_mode(
-                "__stove_id__".to_string(),
-                Mode::Auto {
-                    heating_power_percent: 52,
-                },
-            )
-            .await;
+        client
+            .set_auto_mode("__stove_id__".to_string(), 52)
+            .await
+            .expect("a successful operation");
 
         status_mock.assert();
         control_mock.assert();
-        result.unwrap();
+    }
+
+    #[tokio::test]
+    async fn cant_set_stove_mode_to_auto_with_an_invalid_power_heating_value() {
+        let client = RikaFirenetClient::builder()
+            .base_url("http://localhost")
+            .credentials("someone@rika.com", "Secret!")
+            .build();
+
+        let error = client
+            .set_auto_mode("__stove_id__".to_string(), 101)
+            .await
+            .unwrap_err();
+        let root_cause = error.root_cause();
+        assert_eq!(
+            format!("{root_cause}"),
+            "Heating power must be 0 <= power <= 100 but it was 101"
+        );
     }
 
     #[tokio::test]
@@ -472,9 +673,10 @@ mod tests {
         let control_mock = server.mock(|when, then| {
             when.method(POST)
                 .path("/api/client/__stove_id__/controls")
-                .body_matches(Regex::new("^|&revision=1572181181&|$").unwrap())
-                .body_matches(Regex::new("^|&operatingMode=2&|$").unwrap())
-                .body_matches(Regex::new("^|&targetTemperature=19&|$").unwrap());
+                .body_matches(Regex::new("(^|&)revision=1572181181(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)operatingMode=2(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)setBackTemperature=17(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)targetTemperature=19(&|$)").unwrap());
             then.status(200).body("OK");
         });
 
@@ -483,18 +685,206 @@ mod tests {
             .credentials("someone@rika.com", "Secret!")
             .build();
 
-        let result = client
-            .configure_mode(
-                "__stove_id__".to_string(),
-                Mode::Comfort {
-                    target_temperature: 19,
-                },
-            )
-            .await;
+        client
+            .set_comfort_mode("__stove_id__".to_string(), 17, 19)
+            .await
+            .expect("a successful operation");
 
         status_mock.assert();
         control_mock.assert();
-        result.unwrap();
+    }
+
+    #[tokio::test]
+    async fn cant_set_stove_mode_to_comfort_with_an_invalid_target_or_idle_temperature_value() {
+        let client = RikaFirenetClient::builder()
+            .base_url("http://localhost")
+            .credentials("someone@rika.com", "Secret!")
+            .build();
+
+        let error = client
+            .set_comfort_mode("__stove_id__".to_string(), 12, 13)
+            .await
+            .unwrap_err();
+        let root_cause = error.root_cause();
+        assert_eq!(
+            format!("{root_cause}"),
+            "Target temperature must be 14 <= temp <= 28°C but it was 13"
+        );
+
+        let error = client
+            .set_comfort_mode("__stove_id__".to_string(), 20, 29)
+            .await
+            .unwrap_err();
+        let root_cause = error.root_cause();
+        assert_eq!(
+            format!("{root_cause}"),
+            "Target temperature must be 14 <= temp <= 28°C but it was 29"
+        );
+
+        let error = client
+            .set_comfort_mode("__stove_id__".to_string(), 21, 28)
+            .await
+            .unwrap_err();
+        let root_cause = error.root_cause();
+        assert_eq!(
+            format!("{root_cause}"),
+            "Idle temperature must be 12 <= temp <= 20°C but it was 21"
+        );
+
+        let error = client
+            .set_comfort_mode("__stove_id__".to_string(), 11, 22)
+            .await
+            .unwrap_err();
+        let root_cause = error.root_cause();
+        assert_eq!(
+            format!("{root_cause}"),
+            "Idle temperature must be 12 <= temp <= 20°C but it was 11"
+        );
+
+        let error = client
+            .set_comfort_mode("__stove_id__".to_string(), 19, 17)
+            .await
+            .unwrap_err();
+        let root_cause = error.root_cause();
+        assert_eq!(
+            format!("{root_cause}"),
+            "Target temperature must be greater than idle temperature"
+        );
+    }
+
+    #[tokio::test]
+    async fn can_configure_schedule() {
+        let server = MockServer::start();
+        let status_mock = server.mock(|when, then| {
+            when.method(GET).path("/api/client/__stove_id__/status");
+            then.status(200)
+                .body_from_file("../mock/src/stove-status.json");
+        });
+        let control_mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/client/__stove_id__/controls")
+                .body_matches(Regex::new("(^|&)heatingTimeMon1=06300900(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)heatingTimeMon2=18152245(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)heatingTimeTue1=06300900(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)heatingTimeTue2=18152245(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)heatingTimeWed1=06300900(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)heatingTimeWed2=18152245(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)heatingTimeThu1=06300900(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)heatingTimeThu2=18152245(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)heatingTimeFri1=06300900(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)heatingTimeFri2=18152245(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)heatingTimeSat1=10002230(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)heatingTimeSat2=00000000(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)heatingTimeSun1=10002230(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)heatingTimeSun2=00000000(&|$)").unwrap());
+            then.status(200).body("OK");
+        });
+
+        let client = RikaFirenetClient::builder()
+            .base_url(server.base_url())
+            .credentials("someone@rika.com", "Secret!")
+            .build();
+
+        let schedule = HeatingSchedule::week_vs_end_days(
+            DailySchedule::dual("06300900".parse().unwrap(), "18152245".parse().unwrap()),
+            DailySchedule::single("10002230".parse().unwrap()),
+        );
+        client
+            .enable_schedule("__stove_id__".to_string(), schedule)
+            .await
+            .expect("a successful operation");
+
+        status_mock.assert();
+        control_mock.assert();
+    }
+
+    #[tokio::test]
+    async fn can_enable_frost_mode() {
+        let server = MockServer::start();
+        let status_mock = server.mock(|when, then| {
+            when.method(GET).path("/api/client/__stove_id__/status");
+            then.status(200)
+                .body_from_file("../mock/src/stove-status.json");
+        });
+        let control_mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/client/__stove_id__/controls")
+                .body_matches(Regex::new("(^|&)revision=1572181181(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)frostProtectionActive=true(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)frostProtectionTemperature=8(&|$)").unwrap());
+            then.status(200).body("OK");
+        });
+
+        let client = RikaFirenetClient::builder()
+            .base_url(server.base_url())
+            .credentials("someone@rika.com", "Secret!")
+            .build();
+
+        client
+            .enable_frost_protection("__stove_id__".to_string(), 8)
+            .await
+            .expect("a successful operation");
+
+        status_mock.assert();
+        control_mock.assert();
+    }
+
+    #[tokio::test]
+    async fn cant_enable_frost_protection_with_an_invalid_temperature_value() {
+        let client = RikaFirenetClient::builder()
+            .base_url("http://localhost")
+            .credentials("someone@rika.com", "Secret!")
+            .build();
+
+        let error = client
+            .enable_frost_protection("__stove_id__".to_string(), 3)
+            .await
+            .unwrap_err();
+        let root_cause = error.root_cause();
+        assert_eq!(
+            format!("{root_cause}"),
+            "Frost protection temperature must be 4 <= temp <= 10°C but it was 3"
+        );
+
+        let error = client
+            .enable_frost_protection("__stove_id__".to_string(), 11)
+            .await
+            .unwrap_err();
+        let root_cause = error.root_cause();
+        assert_eq!(
+            format!("{root_cause}"),
+            "Frost protection temperature must be 4 <= temp <= 10°C but it was 11"
+        );
+    }
+
+    #[tokio::test]
+    async fn can_disable_frost_mode() {
+        let server = MockServer::start();
+        let status_mock = server.mock(|when, then| {
+            when.method(GET).path("/api/client/__stove_id__/status");
+            then.status(200)
+                .body_from_file("../mock/src/stove-status.json");
+        });
+        let control_mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/client/__stove_id__/controls")
+                .body_matches(Regex::new("(^|&)revision=1572181181(&|$)").unwrap())
+                .body_matches(Regex::new("(^|&)frostProtectionActive=false(&|$)").unwrap());
+            then.status(200).body("OK");
+        });
+
+        let client = RikaFirenetClient::builder()
+            .base_url(server.base_url())
+            .credentials("someone@rika.com", "Secret!")
+            .build();
+
+        client
+            .disable_frost_protection("__stove_id__".to_string())
+            .await
+            .expect("a successful operation");
+
+        status_mock.assert();
+        control_mock.assert();
     }
 
     #[tokio::test]
@@ -513,7 +903,7 @@ mod tests {
             .credentials("someone@rika.com", "Secret!")
             .build();
 
-        client.logout().await.unwrap();
+        client.logout().await.expect("a successful operation");
 
         logout_mock.assert();
     }

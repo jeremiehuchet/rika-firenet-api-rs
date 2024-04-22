@@ -1,5 +1,8 @@
 use reqwest::Client;
-use rika_firenet_client::{Mode, RikaFirenetClient, RikaFirenetClientBuilder};
+use rika_firenet_client::{
+    model::{DailySchedule, HeatPeriod, HeatingSchedule},
+    RikaFirenetClient, RikaFirenetClientBuilder,
+};
 use testcontainers::{
     clients::{self},
     core::WaitFor,
@@ -149,7 +152,7 @@ async fn can_log_out() {
 }
 
 #[tokio::test]
-async fn can_update_settings() {
+async fn can_turn_stove_off_and_on() {
     let docker = clients::Cli::default();
     let container = docker.run(RikaMock::default());
 
@@ -158,30 +161,172 @@ async fn can_update_settings() {
         .build();
 
     let stove = client.status("12345".to_string()).await.unwrap();
-    assert_eq!(
-        stove.controls.operating_mode,
-        Some(2),
-        "comfort operating mode"
-    );
-    assert_eq!(stove.controls.target_temperature, Some("20".to_string()));
-    assert_eq!(stove.controls.heating_power, Some(50));
+    assert_eq!(stove.controls.on_off, Some(true), "stove is on");
+
+    client.turn_off("12345".to_string()).await.unwrap();
+
+    let stove = client.status("12345".to_string()).await.unwrap();
+    assert_eq!(stove.controls.on_off, Some(false), "stove is off");
+
+    client.turn_on("12345".to_string()).await.unwrap();
+
+    let stove = client.status("12345".to_string()).await.unwrap();
+    assert_eq!(stove.controls.on_off, Some(true), "stove is on");
+}
+
+#[tokio::test]
+async fn can_execute_sample_senario() {
+    let docker = clients::Cli::default();
+    let container = docker.run(RikaMock::default());
+
+    let stove_id = "12345";
+    let client = client_for(&container)
+        .credentials("registered-user@rika-firenet.com", "Secret")
+        .build();
+
+    // let stove_id = "12345";
+    // let client = RikaFirenetClient::builder()
+    //     .base_url("https://www.rika-firenet.com".to_string())
+    //     .credentials("registered-user@rika-firenet.com", "Secret")
+    //     .build();
+
+    let original_status = client.status(stove_id.to_string()).await.unwrap();
+    println!("\nstove status:\n{original_status:?}");
+
+    client.turn_off(stove_id.to_string()).await.unwrap();
+    let status = client.status(stove_id.to_string()).await.unwrap();
+    println!("\nstove status:\n{status:?}");
+    assert_eq!(status.controls.on_off, Some(false), "stove off");
 
     client
-        .configure_mode(
-            "12345".to_string(),
-            Mode::Manual {
-                heating_power_percent: 75,
-            },
+        .set_manual_mode(stove_id.to_string(), 30)
+        .await
+        .unwrap();
+    let status = client.status(stove_id.to_string()).await.unwrap();
+    println!("\nstove status:\n{status:?}");
+    assert_eq!(status.controls.operating_mode, Some(0), "manual mode");
+
+    let schedule = HeatingSchedule::week_vs_end_days(
+        DailySchedule::dual(
+            HeatPeriod::new(7, 30, 10, 00).unwrap(),
+            HeatPeriod::new(18, 15, 22, 45).unwrap(),
+        ),
+        DailySchedule::single(HeatPeriod::new(10, 15, 23, 00).unwrap()),
+    );
+    client
+        .enable_schedule(stove_id.to_string(), schedule)
+        .await
+        .unwrap();
+    let status = client.status(stove_id.to_string()).await.unwrap();
+    println!("\nstove status:\n{status:?}");
+    assert_eq!(
+        status.controls.heating_times_active_for_comfort,
+        Some(true),
+        "heating schedule on"
+    );
+    assert_eq!(
+        status.controls.heating_time_mon1,
+        Some("07301000".to_string()),
+        "monday am"
+    );
+    assert_eq!(
+        status.controls.heating_time_mon2,
+        Some("18152245".to_string()),
+        "monday pm"
+    );
+    assert_eq!(
+        status.controls.heating_time_tue1,
+        Some("07301000".to_string()),
+        "tuesday am"
+    );
+    assert_eq!(
+        status.controls.heating_time_tue2,
+        Some("18152245".to_string()),
+        "tuesday pm"
+    );
+    assert_eq!(
+        status.controls.heating_time_wed1,
+        Some("07301000".to_string()),
+        "wednesday am"
+    );
+    assert_eq!(
+        status.controls.heating_time_wed2,
+        Some("18152245".to_string()),
+        "wednesday pm"
+    );
+    assert_eq!(
+        status.controls.heating_time_thu1,
+        Some("07301000".to_string()),
+        "thuesday am"
+    );
+    assert_eq!(
+        status.controls.heating_time_thu2,
+        Some("18152245".to_string()),
+        "thuesday pm"
+    );
+    assert_eq!(
+        status.controls.heating_time_fri1,
+        Some("07301000".to_string()),
+        "friday am"
+    );
+    assert_eq!(
+        status.controls.heating_time_fri2,
+        Some("18152245".to_string()),
+        "friday pm"
+    );
+    assert_eq!(
+        status.controls.heating_time_sat1,
+        Some("10152300".to_string()),
+        "saturday am"
+    );
+    assert_eq!(
+        status.controls.heating_time_sat2,
+        Some("00000000".to_string()),
+        "saturday pm"
+    );
+    assert_eq!(
+        status.controls.heating_time_sun1,
+        Some("10152300".to_string()),
+        "sunday am"
+    );
+    assert_eq!(
+        status.controls.heating_time_sun2,
+        Some("00000000".to_string()),
+        "sunday pm"
+    );
+
+    client
+        .set_comfort_mode(stove_id.to_string(), 18, 20)
+        .await
+        .unwrap();
+    let status = client.status(stove_id.to_string()).await.unwrap();
+    println!("\nstove status:\n{status:?}");
+    assert_eq!(status.controls.operating_mode, Some(2), "comfort mode");
+    assert_eq!(
+        status.controls.set_back_temperature,
+        Some("18".to_string()),
+        "target temperature"
+    );
+    assert_eq!(
+        status.controls.target_temperature,
+        Some("20".to_string()),
+        "target temperature"
+    );
+
+    client
+        .restore_controls(
+            stove_id.to_string(),
+            original_status.controls.as_ref().clone(),
         )
         .await
         .unwrap();
+    let status = client.status(stove_id.to_string()).await.unwrap();
+    println!("\nstove status:\n{status:?}");
 
-    let stove = client.status("12345".to_string()).await.unwrap();
-    assert_eq!(
-        stove.controls.operating_mode,
-        Some(0),
-        "manual operating mode"
-    );
-    assert_eq!(stove.controls.target_temperature, Some("20".to_string()));
-    assert_eq!(stove.controls.heating_power, Some(75));
+    client.turn_on(stove_id.to_string()).await.unwrap();
+    let status = client.status(stove_id.to_string()).await.unwrap();
+    println!("\nstove status:\n{status:?}");
+    assert_eq!(status.controls.on_off, Some(true), "stove on");
+
+    client.logout().await.unwrap();
 }
