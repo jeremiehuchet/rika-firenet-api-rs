@@ -23,6 +23,3 @@ task-local-extensions = "^0.1"
 httpmock = "^0.7"
 testcontainers = "^0.15"
 tokio = "^1.25"
-
-[build-dependencies]
-anyhow = "^1.0"
