@@ -3,47 +3,32 @@ use rika_firenet_client::{
     model::{DailySchedule, HeatPeriod, HeatingSchedule},
     RikaFirenetClient, RikaFirenetClientBuilder,
 };
-use testcontainers::{
-    clients::{self},
-    core::WaitFor,
-    Container, Image,
-};
+use testcontainers::{core::WaitFor, runners::AsyncRunner, ContainerAsync, GenericImage};
 
 #[derive(Default)]
 struct RikaMock {}
 
-impl Image for RikaMock {
-    type Args = Vec<String>;
-
-    fn name(&self) -> String {
-        String::from("rika-firenet-api-mock")
-    }
-
-    fn tag(&self) -> String {
-        String::from("latest")
-    }
-    fn expose_ports(&self) -> Vec<u16> {
-        vec![3000]
-    }
-
-    fn ready_conditions(&self) -> Vec<WaitFor> {
-        vec![WaitFor::StdOutMessage {
+async fn start_rika_mock() -> ContainerAsync<GenericImage> {
+    GenericImage::new("rika-firenet-api-mock", "latest")
+        .with_exposed_port(3000)
+        .with_wait_for(WaitFor::StdOutMessage {
             message: String::from("Rika Firenet mock listening on port 3000"),
-        }]
-    }
+        })
+        .start()
+        .await
 }
 
-fn client_for<'d>(container: &Container<'d, RikaMock>) -> RikaFirenetClientBuilder {
-    let listening_port = container.ports().map_to_host_port_ipv4(3000).unwrap();
+async fn client_for<'d>(container: &ContainerAsync<GenericImage>) -> RikaFirenetClientBuilder {
+    let listening_port = container.ports().await.map_to_host_port_ipv4(3000).unwrap();
     RikaFirenetClient::builder().base_url(format!("http://127.0.0.1:{listening_port}",))
 }
 
-async fn assert_mock_count<'d>(
+async fn assert_mock_count(
     feature: &str,
     expected_count: u32,
-    container: &Container<'d, RikaMock>,
+    container: &ContainerAsync<GenericImage>,
 ) {
-    let listening_port = container.ports().map_to_host_port_ipv4(3000).unwrap();
+    let listening_port = container.ports().await.map_to_host_port_ipv4(3000).unwrap();
     let http_client = Client::builder().build().expect("an http client");
     let request = http_client
         .get(format!("http://127.0.0.1:{listening_port}/mock/{feature}"))
@@ -64,9 +49,9 @@ async fn assert_mock_count<'d>(
 
 #[tokio::test]
 async fn should_sucessfully_auto_login() {
-    let docker = clients::Cli::default();
-    let container = docker.run(RikaMock::default());
+    let container = start_rika_mock().await;
     let client = client_for(&container)
+        .await
         .credentials("registered-user@rika-firenet.com", "Secret")
         .build();
 
@@ -75,9 +60,9 @@ async fn should_sucessfully_auto_login() {
 
 #[tokio::test]
 async fn can_list_stoves() {
-    let docker = clients::Cli::default();
-    let container = docker.run(RikaMock::default());
+    let container = start_rika_mock().await;
     let client = client_for(&container)
+        .await
         .credentials("registered-user@rika-firenet.com", "Secret")
         .build();
 
@@ -87,9 +72,9 @@ async fn can_list_stoves() {
 
 #[tokio::test]
 async fn can_list_stoves_multiple_times_with_one_single_authentication() {
-    let docker = clients::Cli::default();
-    let container = docker.run(RikaMock::default());
+    let container = start_rika_mock().await;
     let client = client_for(&container)
+        .await
         .credentials("registered-user@rika-firenet.com", "Secret")
         .build();
 
@@ -105,9 +90,9 @@ async fn can_list_stoves_multiple_times_with_one_single_authentication() {
 
 #[tokio::test]
 async fn cant_list_stoves_with_invalid_credentials() {
-    let docker = clients::Cli::default();
-    let container = docker.run(RikaMock::default());
+    let container = start_rika_mock().await;
     let client = client_for(&container)
+        .await
         .credentials("unknown-user@rika-firenet.com", "InvalidSecret")
         .build();
 
@@ -117,9 +102,9 @@ async fn cant_list_stoves_with_invalid_credentials() {
 
 #[tokio::test]
 async fn can_get_stove_status() {
-    let docker = clients::Cli::default();
-    let container = docker.run(RikaMock::default());
+    let container = start_rika_mock().await;
     let client = client_for(&container)
+        .await
         .credentials("registered-user@rika-firenet.com", "Secret")
         .build();
 
@@ -133,11 +118,11 @@ async fn can_get_stove_status() {
 
 #[tokio::test]
 async fn can_log_out() {
-    let docker = clients::Cli::default();
-    let container = docker.run(RikaMock::default());
+    let container = start_rika_mock().await;
     assert_mock_count("logout-count", 0, &container).await;
 
     let client = client_for(&container)
+        .await
         .credentials("registered-user@rika-firenet.com", "Secret")
         .build();
     client.list_stoves().await.unwrap();
@@ -153,10 +138,9 @@ async fn can_log_out() {
 
 #[tokio::test]
 async fn can_turn_stove_off_and_on() {
-    let docker = clients::Cli::default();
-    let container = docker.run(RikaMock::default());
-
+    let container = start_rika_mock().await;
     let client = client_for(&container)
+        .await
         .credentials("registered-user@rika-firenet.com", "Secret")
         .build();
 
@@ -176,11 +160,11 @@ async fn can_turn_stove_off_and_on() {
 
 #[tokio::test]
 async fn can_execute_sample_senario() {
-    let docker = clients::Cli::default();
-    let container = docker.run(RikaMock::default());
+    let container = start_rika_mock().await;
 
     let stove_id = "12345";
     let client = client_for(&container)
+        .await
         .credentials("registered-user@rika-firenet.com", "Secret")
         .build();
 
