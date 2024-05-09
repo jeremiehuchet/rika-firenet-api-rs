@@ -123,6 +123,7 @@ app.post("/api/client/:stoveId/controls", (req, res) => {
       ...(req.body.heatingTimeSun1 ? { heatingTimeSun1: req.body.heatingTimeSun1 } : {}),
       ...(req.body.heatingTimeSun2 ? { heatingTimeSun2: req.body.heatingTimeSun2 } : {}),
     };
+    console.info(`Updated controls for ${stoveId}:`, JSON.stringify(req.session.stoves[stoveId].controls, null, 2))
     res.send("OK");
   } else {
     res.body = `Stove ${stoveId} is not registered for user ${req.session.user}`;
