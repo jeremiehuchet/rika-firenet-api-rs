@@ -9,15 +9,12 @@ use nipper::Document;
 use regex::Regex;
 use reqwest::{redirect::Policy, Client};
 use reqwest_middleware::{ClientBuilder, Middleware};
-pub use rika_firenet_openapi::models::StoveStatus;
-use rika_firenet_openapi::{
-    apis::{
-        auth_api::{self, LoginParams},
-        configuration::Configuration,
-        stoves_api::{self, StoveControlsParams, StoveStatusParams},
-    },
-    models::StoveControls,
+use rika_firenet_openapi::apis::{
+    auth_api::{self, LoginParams},
+    configuration::Configuration,
+    stoves_api::{self, StoveControlsParams, StoveStatusParams},
 };
+pub use rika_firenet_openapi::models::{StoveControls, StoveStatus};
 
 mod auth;
 pub mod model;
@@ -115,11 +112,21 @@ impl RikaFirenetClient {
         Ok(stove_ids)
     }
 
-    pub async fn status(&self, stove_id: String) -> Result<StoveStatus> {
-        Ok(stoves_api::stove_status(&self.configuration, StoveStatusParams { stove_id }).await?)
+    pub async fn status<S: Into<String>>(&self, stove_id: S) -> Result<StoveStatus> {
+        Ok(stoves_api::stove_status(
+            &self.configuration,
+            StoveStatusParams {
+                stove_id: stove_id.into(),
+            },
+        )
+        .await?)
     }
 
-    pub async fn restore_controls(&self, stove_id: String, controls: StoveControls) -> Result<()> {
+    pub async fn restore_controls<S: Into<String>>(
+        &self,
+        stove_id: S,
+        controls: StoveControls,
+    ) -> Result<()> {
         let current_status = self.status(stove_id).await?;
         let restore_status = StoveStatus {
             controls: Box::new(controls),
@@ -129,7 +136,7 @@ impl RikaFirenetClient {
         Ok(stoves_api::stove_controls(&self.configuration, params).await?)
     }
 
-    pub async fn turn_on(&self, stove_id: String) -> Result<()> {
+    pub async fn turn_on<S: Into<String>>(&self, stove_id: S) -> Result<()> {
         let params = StoveControlsParams {
             on_off: Some(true),
             ..self.current_controls(stove_id).await?
@@ -137,7 +144,7 @@ impl RikaFirenetClient {
         Ok(stoves_api::stove_controls(&self.configuration, params).await?)
     }
 
-    pub async fn turn_off(&self, stove_id: String) -> Result<()> {
+    pub async fn turn_off<S: Into<String>>(&self, stove_id: S) -> Result<()> {
         let params = StoveControlsParams {
             on_off: Some(false),
             ..self.current_controls(stove_id).await?
@@ -145,7 +152,11 @@ impl RikaFirenetClient {
         Ok(stoves_api::stove_controls(&self.configuration, params).await?)
     }
 
-    pub async fn set_manual_mode(&self, stove_id: String, heating_power_percent: u8) -> Result<()> {
+    pub async fn set_manual_mode<S: Into<String>>(
+        &self,
+        stove_id: S,
+        heating_power_percent: u8,
+    ) -> Result<()> {
         ensure!(
             (0..100).contains(&heating_power_percent),
             "Heating power must be 0 <= power <= 100 but it was {heating_power_percent}"
@@ -158,7 +169,11 @@ impl RikaFirenetClient {
         Ok(stoves_api::stove_controls(&self.configuration, params).await?)
     }
 
-    pub async fn set_auto_mode(&self, stove_id: String, heating_power_percent: u8) -> Result<()> {
+    pub async fn set_auto_mode<S: Into<String>>(
+        &self,
+        stove_id: S,
+        heating_power_percent: u8,
+    ) -> Result<()> {
         ensure!(
             (0..100).contains(&heating_power_percent),
             "Heating power must be 0 <= power <= 100 but it was {heating_power_percent}"
@@ -171,9 +186,9 @@ impl RikaFirenetClient {
         Ok(stoves_api::stove_controls(&self.configuration, params).await?)
     }
 
-    pub async fn set_comfort_mode(
+    pub async fn set_comfort_mode<S: Into<String>>(
         &self,
-        stove_id: String,
+        stove_id: S,
         idle_temperature: u8,
         target_temperature: u8,
     ) -> Result<()> {
@@ -198,9 +213,9 @@ impl RikaFirenetClient {
         Ok(stoves_api::stove_controls(&self.configuration, params).await?)
     }
 
-    pub async fn enable_frost_protection(
+    pub async fn enable_frost_protection<S: Into<String>>(
         &self,
-        stove_id: String,
+        stove_id: S,
         frost_protection_temperature: u8,
     ) -> Result<()> {
         ensure!((4..10).contains(&frost_protection_temperature), "Frost protection temperature must be 4 <= temp <= 10°C but it was {frost_protection_temperature}");
@@ -212,7 +227,7 @@ impl RikaFirenetClient {
         Ok(stoves_api::stove_controls(&self.configuration, params).await?)
     }
 
-    pub async fn disable_frost_protection(&self, stove_id: String) -> Result<()> {
+    pub async fn disable_frost_protection<S: Into<String>>(&self, stove_id: S) -> Result<()> {
         let params = StoveControlsParams {
             frost_protection_active: Some(false),
             ..self.current_controls(stove_id).await?
@@ -220,7 +235,11 @@ impl RikaFirenetClient {
         Ok(stoves_api::stove_controls(&self.configuration, params).await?)
     }
 
-    pub async fn enable_schedule(&self, stove_id: String, schedule: HeatingSchedule) -> Result<()> {
+    pub async fn enable_schedule<S: Into<String>>(
+        &self,
+        stove_id: S,
+        schedule: HeatingSchedule,
+    ) -> Result<()> {
         let params = StoveControlsParams {
             heating_times_active_for_comfort: Some(true),
             heating_time_mon1: Some(schedule.monday.first.into()),
@@ -243,7 +262,7 @@ impl RikaFirenetClient {
         Ok(stoves_api::stove_controls(&self.configuration, params).await?)
     }
 
-    async fn current_controls(&self, stove_id: String) -> Result<StoveControlsParams> {
+    async fn current_controls<S: Into<String>>(&self, stove_id: S) -> Result<StoveControlsParams> {
         let status = self.status(stove_id).await?;
         Ok(into_controls(status))
     }
@@ -253,7 +272,7 @@ impl RikaFirenetClient {
     }
 }
 
-fn extract_stove_ids(body: &String) -> Vec<String> {
+fn extract_stove_ids(body: &str) -> Vec<String> {
     let document = Document::from(body);
     let links = document.select("ul#stoveList li a");
     links
@@ -464,7 +483,7 @@ mod tests {
             .build();
 
         let status = client
-            .status("12345".to_string())
+            .status("12345")
             .await
             .expect("a successful operation");
 
@@ -492,7 +511,7 @@ mod tests {
             .build();
 
         let status = client
-            .status("12345".to_string())
+            .status("12345")
             .await
             .expect("a successful operation");
 
@@ -526,7 +545,7 @@ mod tests {
             .build();
 
         client
-            .turn_on("__stove_id__".to_string())
+            .turn_on("__stove_id__")
             .await
             .expect("a successful operation");
 
@@ -556,7 +575,7 @@ mod tests {
             .build();
 
         client
-            .turn_off("__stove_id__".to_string())
+            .turn_off("__stove_id__")
             .await
             .expect("a successful operation");
 
@@ -587,7 +606,7 @@ mod tests {
             .build();
 
         client
-            .set_manual_mode("__stove_id__".to_string(), 51)
+            .set_manual_mode("__stove_id__", 51)
             .await
             .expect("a successful operation");
 
@@ -603,7 +622,7 @@ mod tests {
             .build();
 
         let error = client
-            .set_manual_mode("__stove_id__".to_string(), 101)
+            .set_manual_mode("__stove_id__", 101)
             .await
             .unwrap_err();
         let root_cause = error.root_cause();
@@ -636,7 +655,7 @@ mod tests {
             .build();
 
         client
-            .set_auto_mode("__stove_id__".to_string(), 52)
+            .set_auto_mode("__stove_id__", 52)
             .await
             .expect("a successful operation");
 
@@ -651,10 +670,7 @@ mod tests {
             .credentials("someone@rika.com", "Secret!")
             .build();
 
-        let error = client
-            .set_auto_mode("__stove_id__".to_string(), 101)
-            .await
-            .unwrap_err();
+        let error = client.set_auto_mode("__stove_id__", 101).await.unwrap_err();
         let root_cause = error.root_cause();
         assert_eq!(
             format!("{root_cause}"),
@@ -686,7 +702,7 @@ mod tests {
             .build();
 
         client
-            .set_comfort_mode("__stove_id__".to_string(), 17, 19)
+            .set_comfort_mode("__stove_id__", 17, 19)
             .await
             .expect("a successful operation");
 
@@ -702,7 +718,7 @@ mod tests {
             .build();
 
         let error = client
-            .set_comfort_mode("__stove_id__".to_string(), 12, 13)
+            .set_comfort_mode("__stove_id__", 12, 13)
             .await
             .unwrap_err();
         let root_cause = error.root_cause();
@@ -712,7 +728,7 @@ mod tests {
         );
 
         let error = client
-            .set_comfort_mode("__stove_id__".to_string(), 20, 29)
+            .set_comfort_mode("__stove_id__", 20, 29)
             .await
             .unwrap_err();
         let root_cause = error.root_cause();
@@ -722,7 +738,7 @@ mod tests {
         );
 
         let error = client
-            .set_comfort_mode("__stove_id__".to_string(), 21, 28)
+            .set_comfort_mode("__stove_id__", 21, 28)
             .await
             .unwrap_err();
         let root_cause = error.root_cause();
@@ -732,7 +748,7 @@ mod tests {
         );
 
         let error = client
-            .set_comfort_mode("__stove_id__".to_string(), 11, 22)
+            .set_comfort_mode("__stove_id__", 11, 22)
             .await
             .unwrap_err();
         let root_cause = error.root_cause();
@@ -742,7 +758,7 @@ mod tests {
         );
 
         let error = client
-            .set_comfort_mode("__stove_id__".to_string(), 19, 17)
+            .set_comfort_mode("__stove_id__", 19, 17)
             .await
             .unwrap_err();
         let root_cause = error.root_cause();
@@ -790,7 +806,7 @@ mod tests {
             DailySchedule::single("10002230".parse().unwrap()),
         );
         client
-            .enable_schedule("__stove_id__".to_string(), schedule)
+            .enable_schedule("__stove_id__", schedule)
             .await
             .expect("a successful operation");
 
@@ -821,7 +837,7 @@ mod tests {
             .build();
 
         client
-            .enable_frost_protection("__stove_id__".to_string(), 8)
+            .enable_frost_protection("__stove_id__", 8)
             .await
             .expect("a successful operation");
 
@@ -837,7 +853,7 @@ mod tests {
             .build();
 
         let error = client
-            .enable_frost_protection("__stove_id__".to_string(), 3)
+            .enable_frost_protection("__stove_id__", 3)
             .await
             .unwrap_err();
         let root_cause = error.root_cause();
@@ -847,7 +863,7 @@ mod tests {
         );
 
         let error = client
-            .enable_frost_protection("__stove_id__".to_string(), 11)
+            .enable_frost_protection("__stove_id__", 11)
             .await
             .unwrap_err();
         let root_cause = error.root_cause();
@@ -879,7 +895,7 @@ mod tests {
             .build();
 
         client
-            .disable_frost_protection("__stove_id__".to_string())
+            .disable_frost_protection("__stove_id__")
             .await
             .expect("a successful operation");
 

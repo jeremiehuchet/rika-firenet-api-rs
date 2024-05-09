@@ -48,7 +48,7 @@ impl Into<i32> for OperatingMode {
 }
 
 impl OperatingMode {
-    fn parse(mode: i32) -> Result<Self> {
+    pub fn parse(mode: i32) -> Result<Self> {
         match mode {
             0 => Ok(OperatingMode::Manual),
             1 => Ok(OperatingMode::Auto),
