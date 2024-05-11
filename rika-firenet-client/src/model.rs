@@ -2,8 +2,9 @@ use std::str::FromStr;
 
 use anyhow::{bail, ensure, Result};
 use rika_firenet_openapi::models::StoveControls;
+use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum StatusDetail {
     Bake,
     Burnout,
