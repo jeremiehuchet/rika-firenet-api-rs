@@ -102,12 +102,12 @@ app.post("/api/client/:stoveId/controls", (req, res) => {
   } else if (req.session.stoves[stoveId]) {
     req.session.stoves[stoveId].controls = {
       ...req.session.stoves[stoveId].controls,
-      ...(req.body.onOff ? { onOff: /true/.test(req.body.onOff) } : {}),
+      ...(req.body.onOff === true || req.body.onOff === false ? { onOff: req.body.onOff } : {}),
       ...(req.body.operatingMode ? { operatingMode: Number.parseInt(req.body.operatingMode) } : {}),
       ...(req.body.heatingPower ? { heatingPower: Number.parseInt(req.body.heatingPower) } : {}),
       ...(req.body.targetTemperature ? { targetTemperature: req.body.targetTemperature } : {}),
       ...(req.body.setBackTemperature ? { setBackTemperature: req.body.setBackTemperature } : {}),
-      ...(req.body.heatingTimesActiveForComfort ? { heatingTimesActiveForComfort: /true/.test(req.body.heatingTimesActiveForComfort) } : {}),
+      ...(req.body.heatingTimesActiveForComfort === true || req.body.heatingTimesActiveForComfort === false ? { heatingTimesActiveForComfort: req.body.heatingTimesActiveForComfort } : {}),
       ...(req.body.heatingTimeMon1 ? { heatingTimeMon1: req.body.heatingTimeMon1 } : {}),
       ...(req.body.heatingTimeMon2 ? { heatingTimeMon2: req.body.heatingTimeMon2 } : {}),
       ...(req.body.heatingTimeTue1 ? { heatingTimeTue1: req.body.heatingTimeTue1 } : {}),
