@@ -1,0 +1,9 @@
+{
+  extends: [
+    "config:best-practices",
+    ":automergePatch",
+    ":disableRateLimiting",
+    "local>jeremiehuchet/renovate-runner"
+  ],
+  enabledManagers: ["cargo", "docker-compose", "dockerfile", "github-actions", "npm"],
+}
