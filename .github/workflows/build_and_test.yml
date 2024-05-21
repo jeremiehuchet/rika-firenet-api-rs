@@ -11,13 +11,13 @@ jobs:
     name: Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4
+      - uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af # v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-      - uses: actions-rs/cargo@v1
+      - uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505 # v1
         with:
           command: check
 
@@ -25,17 +25,17 @@ jobs:
     name: Test Suite
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/build-push-action@v5
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4
+      - uses: docker/build-push-action@2cdde995de11925a030ce8070c3d77a52ffcf1c0 # v5
         with:
           context: mock
           tags: rika-firenet-api-mock:latest
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af # v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-      - uses: actions-rs/cargo@v1
+      - uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505 # v1
         with:
           command: test
 
@@ -43,14 +43,14 @@ jobs:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4
+      - uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af # v1
         with:
           profile: minimal
           toolchain: stable
           override: true
       - run: rustup component add rustfmt
-      - uses: actions-rs/cargo@v1
+      - uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505 # v1
         with:
           command: fmt
           args: --package rika-firenet-client --check
