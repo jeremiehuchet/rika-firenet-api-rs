@@ -3,23 +3,33 @@ use rika_firenet_client::{
     model::{DailySchedule, HeatPeriod, HeatingSchedule},
     RikaFirenetClient, RikaFirenetClientBuilder,
 };
-use testcontainers::{core::WaitFor, runners::AsyncRunner, ContainerAsync, GenericImage};
+use testcontainers::{
+    core::{ContainerPort, WaitFor},
+    runners::AsyncRunner,
+    ContainerAsync, GenericImage,
+};
 
 #[derive(Default)]
 struct RikaMock {}
 
 async fn start_rika_mock() -> ContainerAsync<GenericImage> {
     GenericImage::new("rika-firenet-api-mock", "latest")
-        .with_exposed_port(3000)
-        .with_wait_for(WaitFor::StdOutMessage {
-            message: String::from("Rika Firenet mock listening on port 3000"),
-        })
+        .with_exposed_port(ContainerPort::Tcp(3000))
+        .with_wait_for(WaitFor::message_on_stdout(
+            "Rika Firenet mock listening on port 3000",
+        ))
         .start()
         .await
+        .unwrap()
 }
 
 async fn client_for<'d>(container: &ContainerAsync<GenericImage>) -> RikaFirenetClientBuilder {
-    let listening_port = container.ports().await.map_to_host_port_ipv4(3000).unwrap();
+    let listening_port = container
+        .ports()
+        .await
+        .unwrap()
+        .map_to_host_port_ipv4(3000)
+        .unwrap();
     RikaFirenetClient::builder().base_url(format!("http://127.0.0.1:{listening_port}",))
 }
 
@@ -28,7 +38,12 @@ async fn assert_mock_count(
     expected_count: u32,
     container: &ContainerAsync<GenericImage>,
 ) {
-    let listening_port = container.ports().await.map_to_host_port_ipv4(3000).unwrap();
+    let listening_port = container
+        .ports()
+        .await
+        .unwrap()
+        .map_to_host_port_ipv4(3000)
+        .unwrap();
     let http_client = Client::builder().build().expect("an http client");
     let request = http_client
         .get(format!("http://127.0.0.1:{listening_port}/mock/{feature}"))
