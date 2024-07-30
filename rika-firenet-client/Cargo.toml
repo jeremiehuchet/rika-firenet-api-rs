@@ -22,5 +22,5 @@ task-local-extensions = "0.1"
 
 [dev-dependencies]
 httpmock = "0.7"
-testcontainers = "0.20"
+testcontainers = "0.21"
 tokio = "1.25"
