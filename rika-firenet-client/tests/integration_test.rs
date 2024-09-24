@@ -1,7 +1,7 @@
 use reqwest::Client;
 use rika_firenet_client::{
-    model::{DailySchedule, HeatPeriod, HeatingSchedule},
-    RikaFirenetClient, RikaFirenetClientBuilder,
+    model::{DailySchedule, HeatPeriod, HeatingSchedule, StatusDetail},
+    HasDetailledStatus, RikaFirenetClient, RikaFirenetClientBuilder,
 };
 use testcontainers::{
     core::{ContainerPort, WaitFor},
@@ -157,17 +157,32 @@ async fn can_turn_stove_off_and_on() {
         .build();
 
     let stove = client.status("12345").await.unwrap();
-    assert_eq!(stove.controls.on_off, Some(true), "stove is on");
+    assert_eq!(stove.controls.on_off, Some(true), "stove control is on");
+    assert_eq!(
+        stove.get_status_details(),
+        StatusDetail::Standby,
+        "stove status is standby"
+    );
 
     client.turn_off("12345").await.unwrap();
 
     let stove = client.status("12345").await.unwrap();
-    assert_eq!(stove.controls.on_off, Some(false), "stove is off");
+    assert_eq!(stove.controls.on_off, Some(false), "stove control is off");
+    assert_eq!(
+        stove.get_status_details(),
+        StatusDetail::Off,
+        "stove status is off"
+    );
 
     client.turn_on("12345").await.unwrap();
 
     let stove = client.status("12345").await.unwrap();
     assert_eq!(stove.controls.on_off, Some(true), "stove is on");
+    assert_eq!(
+        stove.get_status_details(),
+        StatusDetail::Standby,
+        "stove status is standby"
+    );
 }
 
 #[tokio::test]

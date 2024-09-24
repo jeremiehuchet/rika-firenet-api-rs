@@ -126,6 +126,15 @@ app.post("/api/client/:stoveId/controls", (req, res) => {
       ...(req.body.heatingTimeSun1 ? { heatingTimeSun1: req.body.heatingTimeSun1 } : {}),
       ...(req.body.heatingTimeSun2 ? { heatingTimeSun2: req.body.heatingTimeSun2 } : {}),
     };
+    req.session.stoves[stoveId].sensors = {
+      ...req.session.stoves[stoveId].sensors,
+      ...(
+        hasOnOff ? {
+          statusMainState: 1,
+          statusSubState: /true/i.test(req.body.onOff) ? 1 : 0,
+        } : {}
+      ),
+    };
     console.info(`Updated controls for ${stoveId}:`, JSON.stringify(req.session.stoves[stoveId].controls, null, 2))
     res.send("OK");
   } else {
