@@ -9,9 +9,6 @@ use testcontainers::{
     ContainerAsync, GenericImage,
 };
 
-#[derive(Default)]
-struct RikaMock {}
-
 async fn start_rika_mock() -> ContainerAsync<GenericImage> {
     GenericImage::new("rika-firenet-api-mock", "latest")
         .with_exposed_port(ContainerPort::Tcp(3000))

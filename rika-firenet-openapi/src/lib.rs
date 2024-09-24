@@ -1,11 +1,10 @@
 #![allow(unused_imports)]
-
-#[macro_use]
-extern crate serde_derive;
+#![allow(clippy::too_many_arguments)]
 
 extern crate reqwest;
 extern crate serde;
 extern crate serde_json;
+extern crate serde_repr;
 extern crate url;
 
 pub mod apis;
