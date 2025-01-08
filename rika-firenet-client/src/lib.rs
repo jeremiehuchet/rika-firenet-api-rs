@@ -37,7 +37,7 @@ pub struct RikaFirenetClientBuilder {
 
 impl RikaFirenetClientBuilder {
     pub fn base_url<S: Into<String>>(mut self, base_url: S) -> Self {
-        self.base_url = Some(base_url.into());
+        self.base_url = Some(base_url.into().trim_end_matches('/').to_string());
         self
     }
 
@@ -920,6 +920,27 @@ mod tests {
             .build();
 
         client.logout().await.expect("a successful operation");
+
+        logout_mock.assert();
+    }
+
+    #[tokio::test]
+    async fn should_remove_trailing_slashes_from_base_url() {
+        let server = MockServer::start();
+        let logout_mock = server.mock(|when, then| {
+            when.method(GET).path("/web/logout");
+            then.status(418);
+        });
+
+        let client = RikaFirenetClient::builder()
+            .base_url(format!("{}///", server.base_url()))
+            .credentials("someone@rika.com", "Secret!")
+            .build();
+
+        client
+            .logout()
+            .await
+            .expect_err("error in response: status code 418 I'm a teapot");
 
         logout_mock.assert();
     }
