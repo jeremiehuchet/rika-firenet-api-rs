@@ -115,11 +115,7 @@ pub async fn list_stoves(
         match content_type {
             ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
             ContentType::Text => return Ok(content),
-            ContentType::Unsupported(unknown_type) => {
-                return Err(Error::from(serde_json::Error::custom(format!(
-                    "Received `{unknown_type}` content type response that cannot be converted to `String`"
-                ))));
-            }
+            ContentType::Unsupported(unknown_type) => return Ok(content),
         }
     } else {
         let content = resp.text().await?;
