@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use auth::RetryWithAuthMiddleware;
 use lazy_static::lazy_static;
 use log::debug;
 use model::{HeatingSchedule, OperatingMode, StatusDetail};
 use nipper::Document;
 use regex::Regex;
-use reqwest::{redirect::Policy, Client};
+use reqwest::{Client, redirect::Policy};
 use reqwest_middleware::{ClientBuilder, Middleware};
 use rika_firenet_openapi::apis::{
     auth_api::{self, LoginParams},
@@ -218,7 +218,10 @@ impl RikaFirenetClient {
         stove_id: S,
         frost_protection_temperature: u8,
     ) -> Result<()> {
-        ensure!((4..10).contains(&frost_protection_temperature), "Frost protection temperature must be 4 <= temp <= 10°C but it was {frost_protection_temperature}");
+        ensure!(
+            (4..10).contains(&frost_protection_temperature),
+            "Frost protection temperature must be 4 <= temp <= 10°C but it was {frost_protection_temperature}"
+        );
         let params = StoveControlsParams {
             frost_protection_active: Some(true),
             frost_protection_temperature: Some(frost_protection_temperature.to_string()),
@@ -413,9 +416,8 @@ impl HasDetailledStatus for StoveStatus {
 #[cfg(test)]
 mod tests {
     use crate::{
-        extract_stove_ids,
+        HasDetailledStatus, RikaFirenetClient, extract_stove_ids,
         model::{DailySchedule, HeatingSchedule, StatusDetail},
-        HasDetailledStatus, RikaFirenetClient,
     };
     use httpmock::{
         Method::{GET, POST},

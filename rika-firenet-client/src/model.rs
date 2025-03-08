@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use anyhow::{bail, ensure, Result};
+use anyhow::{Result, bail, ensure};
 use rika_firenet_openapi::models::StoveControls;
 use serde::{Deserialize, Serialize};
 

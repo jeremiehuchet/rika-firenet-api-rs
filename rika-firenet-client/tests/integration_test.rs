@@ -1,12 +1,12 @@
 use reqwest::Client;
 use rika_firenet_client::{
-    model::{DailySchedule, HeatPeriod, HeatingSchedule, StatusDetail},
     HasDetailledStatus, RikaFirenetClient, RikaFirenetClientBuilder,
+    model::{DailySchedule, HeatPeriod, HeatingSchedule, StatusDetail},
 };
 use testcontainers::{
+    ContainerAsync, GenericImage,
     core::{ContainerPort, WaitFor},
     runners::AsyncRunner,
-    ContainerAsync, GenericImage,
 };
 
 async fn start_rika_mock() -> ContainerAsync<GenericImage> {
