@@ -6,21 +6,21 @@ use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum StatusDetail {
-    Bake,
-    Burnout,
+    Baking,
+    BurnOff,
     Cleaning,
-    Control,
+    Running,
     DeepCleaning,
     ExternalRequest,
     FrostProtection,
-    Heat,
+    HeatingUp,
     Ignition,
     Off,
     Standby,
     Startup,
     Unknown,
-    Wood,
-    WoodPresenceControl,
+    SplitLogMode,
+    SplitLogCheck,
 }
 
 pub enum StoveControl {
@@ -32,9 +32,7 @@ pub enum StoveControl {
 
 pub enum OperatingMode {
     Manual,
-
     Auto,
-
     Comfort,
 }
 

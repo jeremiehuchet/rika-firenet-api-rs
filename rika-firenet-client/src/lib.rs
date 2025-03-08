@@ -369,6 +369,44 @@ impl HasDetailledStatus for StoveStatus {
                     .unwrap(),
             );
 
+        // based on rika-firenet.com algorithm:
+        //     if (frostStarted) {
+        //         return "Frost protection";
+        //     }
+        //     if (mainState == 1) {
+        //         if (subState == 0)
+        //             return "Stove off";
+        //         else if (subState == 1)
+        //             return "Standby";
+        //         else if (subState == 2)
+        //             return "External Request";
+        //         else if (subState == 3)
+        //             return "Standby";
+        //         return "Substate Unknown";
+        //     } else if (mainState == 2)
+        //         return "Ignition on";
+        //     else if (mainState == 3)
+        //         return "Starting up";
+        //     else if (mainState == 4) {
+        //         if (bakeMode && tempDiff < 10)
+        //             return "Baking";
+        //         else if (bakeMode)
+        //             return "Heating up";
+        //         else
+        //             return "Running";
+        //     } else if (mainState == 5) {
+        //         if (subState == 3 || subState == 4)
+        //             return "Big Clean";
+        //         else
+        //             return "Clean";
+        //     } else if (mainState == 6)
+        //         return "Burn off";
+        //     else if (mainState == 11 || mainState == 13 || mainState == 14 || mainState == 16 || mainState == 17 || mainState == 50)
+        //         return "Split log check";
+        //     else if (mainState == 20 || mainState == 21)
+        //         return "Split log mode";
+        //     return "Unknown";
+        // }
         if frost_started {
             return StatusDetail::FrostProtection;
         }
@@ -389,11 +427,11 @@ impl HasDetailledStatus for StoveStatus {
             return StatusDetail::Startup;
         } else if main_state == 4 {
             if bake_mode && temp_diff < 10 {
-                return StatusDetail::Bake;
+                return StatusDetail::Baking;
             } else if bake_mode {
-                return StatusDetail::Heat;
+                return StatusDetail::HeatingUp;
             } else {
-                return StatusDetail::Control;
+                return StatusDetail::Running;
             }
         } else if main_state == 5 {
             if sub_state == 3 || sub_state == 4 {
@@ -402,7 +440,7 @@ impl HasDetailledStatus for StoveStatus {
                 return StatusDetail::Cleaning;
             }
         } else if main_state == 6 {
-            return StatusDetail::Burnout;
+            return StatusDetail::BurnOff;
         } else if main_state == 11
             || main_state == 13
             || main_state == 14
@@ -410,9 +448,9 @@ impl HasDetailledStatus for StoveStatus {
             || main_state == 17
             || main_state == 50
         {
-            return StatusDetail::WoodPresenceControl;
+            return StatusDetail::SplitLogCheck;
         } else if main_state == 20 || main_state == 21 {
-            return StatusDetail::Wood;
+            return StatusDetail::SplitLogMode;
         }
         return StatusDetail::Unknown;
     }
