@@ -1,18 +1,23 @@
 use std::sync::Arc;
 
 use anyhow::{Result, ensure};
+use async_trait::async_trait;
 use auth::RetryWithAuthMiddleware;
+use header::CONTENT_TYPE;
+use http::{Extensions, HeaderValue, header};
 use lazy_static::lazy_static;
 use log::debug;
 use model::{HeatingSchedule, OperatingMode, StatusDetail};
 use nipper::Document;
 use regex::Regex;
-use reqwest::{Client, redirect::Policy};
-use reqwest_middleware::{ClientBuilder, Middleware};
+use reqwest::{Client, Request, Response, redirect::Policy};
+use reqwest_middleware::{ClientBuilder, Middleware, Next};
+use rika_firenet_openapi::apis::auth_api::{AuthApi, AuthApiClient};
+use rika_firenet_openapi::apis::stoves_api::{StovesApi, StovesApiClient};
 use rika_firenet_openapi::apis::{
-    auth_api::{self, LoginParams},
+    auth_api::LoginParams,
     configuration::Configuration,
-    stoves_api::{self, StoveControlsParams, StoveStatusParams},
+    stoves_api::{StoveControlsParams, StoveStatusParams},
 };
 pub use rika_firenet_openapi::models::{StoveControls, StoveStatus};
 
@@ -71,32 +76,37 @@ impl RikaFirenetClientBuilder {
         if let Some(reqwest_middleware) = self.reqwest_middleware.as_ref() {
             login_client = login_client.with_arc(reqwest_middleware.clone());
         }
+        let auth_api = Arc::new(AuthApiClient::new(Arc::new(Configuration {
+            client: login_client.build(),
+            ..api_configuration.clone()
+        })));
 
         let login_middleware = RetryWithAuthMiddleware::new(
-            Configuration {
-                client: login_client.build(),
-                ..api_configuration.clone()
-            },
+            auth_api.clone(),
             self.credentials
                 .expect("API can't be used without credentials"),
         );
 
-        let mut api_client = ClientBuilder::new(inner_client).with(login_middleware);
+        let mut api_client = ClientBuilder::new(inner_client)
+            .with(login_middleware)
+            .with(OverrideResponseContentTypeHeader {});
         if let Some(prometheus_middleware) = self.reqwest_middleware.as_ref() {
             api_client = api_client.with_arc(prometheus_middleware.clone());
         }
         RikaFirenetClient {
-            configuration: Configuration {
+            auth_api,
+            stoves_api: Arc::new(StovesApiClient::new(Arc::new(Configuration {
                 client: api_client.build(),
                 ..api_configuration
-            },
+            }))),
         }
     }
 }
 
 #[derive(Clone)]
 pub struct RikaFirenetClient {
-    configuration: Configuration,
+    auth_api: Arc<AuthApiClient>,
+    stoves_api: Arc<StovesApiClient>,
 }
 
 impl RikaFirenetClient {
@@ -105,7 +115,7 @@ impl RikaFirenetClient {
     }
 
     pub async fn list_stoves(&self) -> Result<Vec<String>> {
-        let stove_body: String = stoves_api::list_stoves(&self.configuration).await?;
+        let stove_body: String = self.stoves_api.list_stoves().await?;
         debug!("List stoves result: {stove_body}");
         let stove_ids = extract_stove_ids(&stove_body);
         debug!("Extracted stoves ids: {}", stove_ids.join(", "));
@@ -113,13 +123,12 @@ impl RikaFirenetClient {
     }
 
     pub async fn status<S: Into<String>>(&self, stove_id: S) -> Result<StoveStatus> {
-        Ok(stoves_api::stove_status(
-            &self.configuration,
-            StoveStatusParams {
+        Ok(self
+            .stoves_api
+            .stove_status(StoveStatusParams {
                 stove_id: stove_id.into(),
-            },
-        )
-        .await?)
+            })
+            .await?)
     }
 
     pub async fn restore_controls<S: Into<String>>(
@@ -129,11 +138,11 @@ impl RikaFirenetClient {
     ) -> Result<()> {
         let current_status = self.status(stove_id).await?;
         let restore_status = StoveStatus {
-            controls: Box::new(controls),
+            controls,
             ..current_status
         };
         let params = into_controls(restore_status);
-        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+        Ok(self.stoves_api.stove_controls(params).await?)
     }
 
     pub async fn turn_on<S: Into<String>>(&self, stove_id: S) -> Result<()> {
@@ -141,7 +150,7 @@ impl RikaFirenetClient {
             on_off: Some(true),
             ..self.current_controls(stove_id).await?
         };
-        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+        Ok(self.stoves_api.stove_controls(params).await?)
     }
 
     pub async fn turn_off<S: Into<String>>(&self, stove_id: S) -> Result<()> {
@@ -149,7 +158,7 @@ impl RikaFirenetClient {
             on_off: Some(false),
             ..self.current_controls(stove_id).await?
         };
-        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+        Ok(self.stoves_api.stove_controls(params).await?)
     }
 
     pub async fn set_manual_mode<S: Into<String>>(
@@ -166,7 +175,7 @@ impl RikaFirenetClient {
             heating_power: Some(heating_power_percent.into()),
             ..self.current_controls(stove_id).await?
         };
-        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+        Ok(self.stoves_api.stove_controls(params).await?)
     }
 
     pub async fn set_auto_mode<S: Into<String>>(
@@ -183,7 +192,7 @@ impl RikaFirenetClient {
             heating_power: Some(heating_power_percent.into()),
             ..self.current_controls(stove_id).await?
         };
-        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+        Ok(self.stoves_api.stove_controls(params).await?)
     }
 
     pub async fn set_comfort_mode<S: Into<String>>(
@@ -210,7 +219,7 @@ impl RikaFirenetClient {
             set_back_temperature: Some(idle_temperature.to_string()),
             ..self.current_controls(stove_id).await?
         };
-        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+        Ok(self.stoves_api.stove_controls(params).await?)
     }
 
     pub async fn enable_frost_protection<S: Into<String>>(
@@ -227,7 +236,7 @@ impl RikaFirenetClient {
             frost_protection_temperature: Some(frost_protection_temperature.to_string()),
             ..self.current_controls(stove_id).await?
         };
-        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+        Ok(self.stoves_api.stove_controls(params).await?)
     }
 
     pub async fn disable_frost_protection<S: Into<String>>(&self, stove_id: S) -> Result<()> {
@@ -235,7 +244,7 @@ impl RikaFirenetClient {
             frost_protection_active: Some(false),
             ..self.current_controls(stove_id).await?
         };
-        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+        Ok(self.stoves_api.stove_controls(params).await?)
     }
 
     pub async fn enable_schedule<S: Into<String>>(
@@ -262,7 +271,7 @@ impl RikaFirenetClient {
             ..self.current_controls(stove_id).await?
         };
         println!("{params:?}");
-        Ok(stoves_api::stove_controls(&self.configuration, params).await?)
+        Ok(self.stoves_api.stove_controls(params).await?)
     }
 
     async fn current_controls<S: Into<String>>(&self, stove_id: S) -> Result<StoveControlsParams> {
@@ -271,7 +280,7 @@ impl RikaFirenetClient {
     }
 
     pub async fn logout(&self) -> Result<()> {
-        Ok(auth_api::logout(&self.configuration).await?)
+        Ok(self.auth_api.logout().await?)
     }
 }
 
@@ -409,7 +418,44 @@ impl HasDetailledStatus for StoveStatus {
     }
 
     fn get_heating_schedule(&self) -> HeatingSchedule {
-        HeatingSchedule::from(self.controls.as_ref().clone())
+        HeatingSchedule::from(self.controls.clone())
+    }
+}
+
+struct OverrideResponseContentTypeHeader {}
+
+#[async_trait]
+impl Middleware for OverrideResponseContentTypeHeader {
+    async fn handle(
+        &self,
+        request: Request,
+        extensions: &mut Extensions,
+        next: Next<'_>,
+    ) -> reqwest_middleware::Result<Response> {
+        let mut response = next
+            .clone()
+            .run(
+                request
+                    .try_clone()
+                    .expect("request shouldn't have a stream body"),
+                extensions,
+            )
+            .await?;
+        let headers = response.headers_mut();
+        let content_type = headers
+            .get(CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok());
+        match content_type {
+            Some(content_type) => {
+                if !content_type.starts_with("application") || !content_type.contains("json") {
+                    headers.insert(CONTENT_TYPE, HeaderValue::from_static("text/plain"));
+                }
+            }
+            None => {
+                headers.insert(CONTENT_TYPE, HeaderValue::from_static("text/plain"));
+            }
+        }
+        return Ok(response);
     }
 }
 

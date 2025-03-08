@@ -46,7 +46,7 @@ Set stove parameters
 Name | Type | Description  | Required | Notes
 ------------- | ------------- | ------------- | ------------- | -------------
 **stove_id** | **String** | Stove identifier | [required] |
-**room_power_request** | Option<**i32**> |  |  |
+**room_power_request** | Option<**u8**> |  |  |
 **bake_temperature** | Option<**String**> |  |  |
 **convection_fan1_active** | Option<**bool**> |  |  |
 **convection_fan1_area** | Option<**i32**> |  |  |
@@ -62,7 +62,7 @@ Name | Type | Description  | Required | Notes
 **eco_mode** | Option<**bool**> |  |  |
 **frost_protection_active** | Option<**bool**> |  |  |
 **frost_protection_temperature** | Option<**String**> |  |  |
-**heating_power** | Option<**i32**> |  |  |
+**heating_power** | Option<**u8**> |  |  |
 **heating_time_fri1** | Option<**String**> |  |  |
 **heating_time_fri2** | Option<**String**> |  |  |
 **heating_time_mon1** | Option<**String**> |  |  |
@@ -79,7 +79,7 @@ Name | Type | Description  | Required | Notes
 **heating_time_wed2** | Option<**String**> |  |  |
 **heating_times_active_for_comfort** | Option<**bool**> |  |  |
 **on_off** | Option<**bool**> |  |  |
-**operating_mode** | Option<**i32**> |  |  |
+**operating_mode** | Option<**u8**> |  |  |
 **revision** | Option<**i32**> |  |  |
 **set_back_temperature** | Option<**String**> |  |  |
 **target_temperature** | Option<**String**> |  |  |

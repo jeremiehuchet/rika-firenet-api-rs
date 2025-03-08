@@ -4,7 +4,7 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**room_power_request** | Option<**i32**> |  | [optional]
+**room_power_request** | Option<**u8**> |  | [optional]
 **bake_temperature** | Option<**String**> |  | [optional]
 **convection_fan1_active** | Option<**bool**> |  | [optional]
 **convection_fan1_area** | Option<**i32**> |  | [optional]
@@ -20,7 +20,7 @@ Name | Type | Description | Notes
 **eco_mode** | Option<**bool**> |  | [optional]
 **frost_protection_active** | Option<**bool**> |  | [optional]
 **frost_protection_temperature** | Option<**String**> |  | [optional]
-**heating_power** | Option<**i32**> |  | [optional]
+**heating_power** | Option<**u8**> |  | [optional]
 **heating_time_fri1** | Option<**String**> |  | [optional]
 **heating_time_fri2** | Option<**String**> |  | [optional]
 **heating_time_mon1** | Option<**String**> |  | [optional]
@@ -37,7 +37,7 @@ Name | Type | Description | Notes
 **heating_time_wed2** | Option<**String**> |  | [optional]
 **heating_times_active_for_comfort** | Option<**bool**> |  | [optional]
 **on_off** | Option<**bool**> |  | [optional]
-**operating_mode** | Option<**i32**> |  | [optional]
+**operating_mode** | Option<**u8**> |  | [optional]
 **revision** | Option<**i32**> |  | [optional]
 **set_back_temperature** | Option<**String**> |  | [optional]
 **target_temperature** | Option<**String**> |  | [optional]

@@ -86,10 +86,10 @@ Name | Type | Description | Notes
 **status_error** | **i32** |  | 
 **status_frost_started** | **bool** |  | 
 **status_heating_times_not_programmed** | **bool** |  | 
-**status_main_state** | **i32** |  | 
+**status_main_state** | **u8** |  | 
 **status_service** | **i32** |  | 
 **status_sub_error** | **i32** |  | 
-**status_sub_state** | **i32** |  | 
+**status_sub_state** | **u8** |  | 
 **status_warning** | **i32** |  | 
 **status_wifi_strength** | **i32** |  | 
 

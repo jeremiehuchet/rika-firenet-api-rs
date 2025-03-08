@@ -30,11 +30,11 @@ pub struct StoveStatus {
     #[serde(rename = "lastSeenMinutes")]
     pub last_seen_minutes: i32,
     #[serde(rename = "controls")]
-    pub controls: Box<models::StoveControls>,
+    pub controls: models::StoveControls,
     #[serde(rename = "sensors")]
-    pub sensors: Box<models::StoveSensors>,
+    pub sensors: models::StoveSensors,
     #[serde(rename = "stoveFeatures")]
-    pub stove_features: Box<models::StoveFeatures>,
+    pub stove_features: models::StoveFeatures,
 }
 
 impl StoveStatus {
@@ -56,9 +56,9 @@ impl StoveStatus {
             stove_type,
             last_confirmed_revision,
             last_seen_minutes,
-            controls: Box::new(controls),
-            sensors: Box::new(sensors),
-            stove_features: Box::new(stove_features),
+            controls,
+            sensors,
+            stove_features,
         }
     }
 }

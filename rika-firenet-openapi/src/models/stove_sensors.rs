@@ -178,13 +178,13 @@ pub struct StoveSensors {
     #[serde(rename = "statusHeatingTimesNotProgrammed")]
     pub status_heating_times_not_programmed: bool,
     #[serde(rename = "statusMainState")]
-    pub status_main_state: i32,
+    pub status_main_state: u8,
     #[serde(rename = "statusService")]
     pub status_service: i32,
     #[serde(rename = "statusSubError")]
     pub status_sub_error: i32,
     #[serde(rename = "statusSubState")]
-    pub status_sub_state: i32,
+    pub status_sub_state: u8,
     #[serde(rename = "statusWarning")]
     pub status_warning: i32,
     #[serde(rename = "statusWifiStrength")]
@@ -275,10 +275,10 @@ impl StoveSensors {
         status_error: i32,
         status_frost_started: bool,
         status_heating_times_not_programmed: bool,
-        status_main_state: i32,
+        status_main_state: u8,
         status_service: i32,
         status_sub_error: i32,
-        status_sub_state: i32,
+        status_sub_state: u8,
         status_warning: i32,
         status_wifi_strength: i32,
     ) -> StoveSensors {

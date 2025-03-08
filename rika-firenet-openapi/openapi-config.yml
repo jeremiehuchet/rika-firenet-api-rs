@@ -1,5 +1,10 @@
 additionalProperties:
   packageName: rika-firenet-openapi
   packageVersion: 0.1.0
+  avoidBoxedModels: true
+  bestFitInt: true
+  library: reqwest-trait
+  mockall: true
+  preferUnsignedInt: true
   useSingleRequestParameter: true
   supportMiddleware: true

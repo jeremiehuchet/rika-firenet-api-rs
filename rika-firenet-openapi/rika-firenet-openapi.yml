@@ -268,6 +268,8 @@ components:
       properties:
         RoomPowerRequest:
           type: integer
+          minimum: 1
+          maximum: 4
         bakeTemperature:
           type: string
         convectionFan1Active:
@@ -300,6 +302,8 @@ components:
           type: string
         heatingPower:
           type: integer
+          minimum: 0
+          maximum: 100
         heatingTimeFri1:
           type: string
         heatingTimeFri2:
@@ -334,6 +338,8 @@ components:
           type: boolean
         operatingMode:
           type: integer
+          minimum: 0
+          maximum: 2
         revision:
           type: integer
         setBackTemperature:
@@ -511,12 +517,16 @@ components:
           type: boolean
         statusMainState:
           type: integer
+          minimum: 0
+          maximum: 50
         statusService:
           type: integer
         statusSubError:
           type: integer
         statusSubState:
           type: integer
+          minimum: 0
+          maximum: 4
         statusWarning:
           type: integer
         statusWifiStrength:

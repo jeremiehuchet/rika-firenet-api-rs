@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StoveControls {
     #[serde(rename = "RoomPowerRequest", skip_serializing_if = "Option::is_none")]
-    pub room_power_request: Option<i32>,
+    pub room_power_request: Option<u8>,
     #[serde(rename = "bakeTemperature", skip_serializing_if = "Option::is_none")]
     pub bake_temperature: Option<String>,
     #[serde(
@@ -64,7 +64,7 @@ pub struct StoveControls {
     )]
     pub frost_protection_temperature: Option<String>,
     #[serde(rename = "heatingPower", skip_serializing_if = "Option::is_none")]
-    pub heating_power: Option<i32>,
+    pub heating_power: Option<u8>,
     #[serde(rename = "heatingTimeFri1", skip_serializing_if = "Option::is_none")]
     pub heating_time_fri1: Option<String>,
     #[serde(rename = "heatingTimeFri2", skip_serializing_if = "Option::is_none")]
@@ -101,7 +101,7 @@ pub struct StoveControls {
     #[serde(rename = "onOff", skip_serializing_if = "Option::is_none")]
     pub on_off: Option<bool>,
     #[serde(rename = "operatingMode", skip_serializing_if = "Option::is_none")]
-    pub operating_mode: Option<i32>,
+    pub operating_mode: Option<u8>,
     #[serde(rename = "revision", skip_serializing_if = "Option::is_none")]
     pub revision: Option<i32>,
     #[serde(rename = "setBackTemperature", skip_serializing_if = "Option::is_none")]

@@ -316,7 +316,7 @@ async fn can_execute_sample_senario() {
     );
 
     client
-        .restore_controls(stove_id, original_status.controls.as_ref().clone())
+        .restore_controls(stove_id, original_status.controls.clone())
         .await
         .unwrap();
     let status = client.status(stove_id).await.unwrap();

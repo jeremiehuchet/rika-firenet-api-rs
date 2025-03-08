@@ -38,8 +38,8 @@ pub enum OperatingMode {
     Comfort,
 }
 
-impl Into<i32> for OperatingMode {
-    fn into(self) -> i32 {
+impl Into<u8> for OperatingMode {
+    fn into(self) -> u8 {
         match self {
             OperatingMode::Manual => 0,
             OperatingMode::Auto => 1,

@@ -3,22 +3,21 @@ use http::Extensions;
 use log::debug;
 use reqwest::{Request, Response};
 use reqwest_middleware::{Error, Middleware, Next, Result};
-use rika_firenet_openapi::apis::{
-    auth_api::{self, LoginParams},
-    configuration::Configuration,
-};
+use rika_firenet_openapi::apis::auth_api::LoginParams;
+use rika_firenet_openapi::apis::auth_api::{AuthApi, AuthApiClient};
+use std::sync::Arc;
 
 pub(crate) struct RetryWithAuthMiddleware {
-    rika_configuration: Configuration,
+    auth_api: Arc<AuthApiClient>,
     rika_credentials: LoginParams,
 }
 impl RetryWithAuthMiddleware {
     pub(crate) fn new(
-        configuration: Configuration,
+        api: Arc<AuthApiClient>,
         credentials: LoginParams,
     ) -> RetryWithAuthMiddleware {
         RetryWithAuthMiddleware {
-            rika_configuration: configuration.clone(),
+            auth_api: api.clone(),
             rika_credentials: credentials,
         }
     }
@@ -44,9 +43,7 @@ impl Middleware for RetryWithAuthMiddleware {
 
         if !is_login_or_logout_request(&request) && is_login_redirection(&initial_result) {
             debug!("Login redirect response detected");
-            return match auth_api::login(&self.rika_configuration, self.rika_credentials.clone())
-                .await
-            {
+            return match self.auth_api.login(self.rika_credentials.clone()).await {
                 Ok(()) => {
                     debug!("Retrying original request");
                     next.run(request, extensions).await
