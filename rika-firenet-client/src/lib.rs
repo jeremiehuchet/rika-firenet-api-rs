@@ -476,6 +476,7 @@ mod tests {
         let status_mock = server.mock(|when, then| {
             when.method(GET).path("/api/client/12345/status");
             then.status(200)
+                .header("content-type", "application/json")
                 .body_from_file("../mock/src/stove-status.json");
         });
 
@@ -504,6 +505,7 @@ mod tests {
         let status_mock = server.mock(|when, then| {
             when.method(GET).path("/api/client/12345/status");
             then.status(200)
+                .header("content-type", "application/json")
                 .body_from_file("../mock/src/stove-status.json");
         });
 
@@ -531,6 +533,7 @@ mod tests {
         let status_mock = server.mock(|when, then| {
             when.method(GET).path("/api/client/__stove_id__/status");
             then.status(200)
+                .header("content-type", "application/json")
                 .body_from_file("../mock/src/stove-status.json");
         });
         let control_mock = server.mock(|when, then| {
@@ -561,6 +564,7 @@ mod tests {
         let status_mock = server.mock(|when, then| {
             when.method(GET).path("/api/client/__stove_id__/status");
             then.status(200)
+                .header("content-type", "application/json")
                 .body_from_file("../mock/src/stove-status.json");
         });
         let control_mock = server.mock(|when, then| {
@@ -591,6 +595,7 @@ mod tests {
         let status_mock = server.mock(|when, then| {
             when.method(GET).path("/api/client/__stove_id__/status");
             then.status(200)
+                .header("content-type", "application/json")
                 .body_from_file("../mock/src/stove-status.json");
         });
         let control_mock = server.mock(|when, then| {
@@ -640,6 +645,7 @@ mod tests {
         let status_mock = server.mock(|when, then| {
             when.method(GET).path("/api/client/__stove_id__/status");
             then.status(200)
+                .header("content-type", "application/json")
                 .body_from_file("../mock/src/stove-status.json");
         });
         let control_mock = server.mock(|when, then| {
@@ -686,6 +692,7 @@ mod tests {
         let status_mock = server.mock(|when, then| {
             when.method(GET).path("/api/client/__stove_id__/status");
             then.status(200)
+                .header("content-type", "application/json")
                 .body_from_file("../mock/src/stove-status.json");
         });
         let control_mock = server.mock(|when, then| {
@@ -776,6 +783,7 @@ mod tests {
         let status_mock = server.mock(|when, then| {
             when.method(GET).path("/api/client/__stove_id__/status");
             then.status(200)
+                .header("content-type", "application/json")
                 .body_from_file("../mock/src/stove-status.json");
         });
         let control_mock = server.mock(|when, then| {
@@ -822,6 +830,7 @@ mod tests {
         let status_mock = server.mock(|when, then| {
             when.method(GET).path("/api/client/__stove_id__/status");
             then.status(200)
+                .header("content-type", "application/json")
                 .body_from_file("../mock/src/stove-status.json");
         });
         let control_mock = server.mock(|when, then| {
@@ -881,6 +890,7 @@ mod tests {
         let status_mock = server.mock(|when, then| {
             when.method(GET).path("/api/client/__stove_id__/status");
             then.status(200)
+                .header("content-type", "application/json")
                 .body_from_file("../mock/src/stove-status.json");
         });
         let control_mock = server.mock(|when, then| {
