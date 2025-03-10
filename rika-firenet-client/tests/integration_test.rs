@@ -112,7 +112,7 @@ async fn can_get_stove_status() {
         .base_url(container.rika_firenet_base_url().await)
         .build("registered-user@rika-firenet.com", "Secret");
 
-    let stove = client.status("12345").await.unwrap();
+    let stove = client.status("12345".to_owned()).await.unwrap();
 
     assert_eq!(stove.stove_id, "12345");
     assert_eq!(stove.oem, "RIKA");
@@ -146,7 +146,7 @@ async fn can_turn_stove_off_and_on() {
         .base_url(container.rika_firenet_base_url().await)
         .build("registered-user@rika-firenet.com", "Secret");
 
-    let stove = client.status("12345").await.unwrap();
+    let stove = client.status("12345".to_owned()).await.unwrap();
     assert_eq!(stove.controls.on_off, Some(true), "stove control is on");
     assert_eq!(
         stove.get_status_details(),
@@ -154,9 +154,9 @@ async fn can_turn_stove_off_and_on() {
         "stove status is standby"
     );
 
-    client.turn_off("12345").await.unwrap();
+    client.turn_off("12345".to_owned()).await.unwrap();
 
-    let stove = client.status("12345").await.unwrap();
+    let stove = client.status("12345".to_owned()).await.unwrap();
     assert_eq!(stove.controls.on_off, Some(false), "stove control is off");
     assert_eq!(
         stove.get_status_details(),
@@ -164,9 +164,9 @@ async fn can_turn_stove_off_and_on() {
         "stove status is off"
     );
 
-    client.turn_on("12345").await.unwrap();
+    client.turn_on("12345".to_owned()).await.unwrap();
 
-    let stove = client.status("12345").await.unwrap();
+    let stove = client.status("12345".to_owned()).await.unwrap();
     assert_eq!(stove.controls.on_off, Some(true), "stove is on");
     assert_eq!(
         stove.get_status_details(),
@@ -190,16 +190,19 @@ async fn can_execute_sample_senario() {
     //     .build("registered-user@rika-firenet.com", "Secret")
     //    ;
 
-    let original_status = client.status(stove_id).await.unwrap();
+    let original_status = client.status(stove_id.to_owned()).await.unwrap();
     println!("\nstove status:\n{original_status:?}");
 
-    client.turn_off(stove_id).await.unwrap();
-    let status = client.status(stove_id).await.unwrap();
+    client.turn_off(stove_id.to_owned()).await.unwrap();
+    let status = client.status(stove_id.to_owned()).await.unwrap();
     println!("\nstove status:\n{status:?}");
     assert_eq!(status.controls.on_off, Some(false), "stove off");
 
-    client.set_manual_mode(stove_id, 30).await.unwrap();
-    let status = client.status(stove_id).await.unwrap();
+    client
+        .set_manual_mode(stove_id.to_owned(), 30)
+        .await
+        .unwrap();
+    let status = client.status(stove_id.to_owned()).await.unwrap();
     println!("\nstove status:\n{status:?}");
     assert_eq!(status.controls.operating_mode, Some(0), "manual mode");
 
@@ -210,8 +213,11 @@ async fn can_execute_sample_senario() {
         ),
         DailySchedule::single(HeatPeriod::new(10, 15, 23, 00).unwrap()),
     );
-    client.enable_schedule(stove_id, schedule).await.unwrap();
-    let status = client.status(stove_id).await.unwrap();
+    client
+        .enable_schedule(stove_id.to_owned(), schedule)
+        .await
+        .unwrap();
+    let status = client.status(stove_id.to_owned()).await.unwrap();
     println!("\nstove status:\n{status:?}");
     assert_eq!(
         status.controls.heating_times_active_for_comfort,
@@ -289,8 +295,11 @@ async fn can_execute_sample_senario() {
         "sunday pm"
     );
 
-    client.set_comfort_mode(stove_id, 18, 20).await.unwrap();
-    let status = client.status(stove_id).await.unwrap();
+    client
+        .set_comfort_mode(stove_id.to_owned(), 18, 20)
+        .await
+        .unwrap();
+    let status = client.status(stove_id.to_owned()).await.unwrap();
     println!("\nstove status:\n{status:?}");
     assert_eq!(status.controls.operating_mode, Some(2), "comfort mode");
     assert_eq!(
@@ -305,14 +314,14 @@ async fn can_execute_sample_senario() {
     );
 
     client
-        .restore_controls(stove_id, original_status.controls.clone())
+        .restore_controls(stove_id.to_owned(), original_status.controls.clone())
         .await
         .unwrap();
-    let status = client.status(stove_id).await.unwrap();
+    let status = client.status(stove_id.to_owned()).await.unwrap();
     println!("\nstove status:\n{status:?}");
 
-    client.turn_on(stove_id).await.unwrap();
-    let status = client.status(stove_id).await.unwrap();
+    client.turn_on(stove_id.to_owned()).await.unwrap();
+    let status = client.status(stove_id.to_owned()).await.unwrap();
     println!("\nstove status:\n{status:?}");
     assert_eq!(status.controls.on_off, Some(true), "stove on");
 
