@@ -9,6 +9,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0"
 async-trait = "0.1"
+bon = "3.4"
 http = "1.0"
 lazy_static = "1.4"
 log = "0.4"

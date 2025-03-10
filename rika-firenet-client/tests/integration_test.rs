@@ -1,6 +1,6 @@
 use reqwest::Client;
 use rika_firenet_client::{
-    HasDetailledStatus, RikaFirenetClient, RikaFirenetClientBuilder,
+    HasDetailledStatus, RikaFirenet, RikaFirenetClient,
     model::{DailySchedule, HeatPeriod, HeatingSchedule, StatusDetail},
 };
 use testcontainers::{
@@ -20,52 +20,48 @@ async fn start_rika_mock() -> ContainerAsync<GenericImage> {
         .unwrap()
 }
 
-async fn client_for<'d>(container: &ContainerAsync<GenericImage>) -> RikaFirenetClientBuilder {
-    let listening_port = container
-        .ports()
-        .await
-        .unwrap()
-        .map_to_host_port_ipv4(3000)
-        .unwrap();
-    RikaFirenetClient::builder().base_url(format!("http://127.0.0.1:{listening_port}",))
+trait RikaFirenetHost {
+    fn rika_firenet_base_url(&self) -> impl Future<Output = String>;
+    fn assert_mock_count(&self, feature: &str, expected_count: u32) -> impl Future<Output = ()>;
 }
 
-async fn assert_mock_count(
-    feature: &str,
-    expected_count: u32,
-    container: &ContainerAsync<GenericImage>,
-) {
-    let listening_port = container
-        .ports()
-        .await
-        .unwrap()
-        .map_to_host_port_ipv4(3000)
-        .unwrap();
-    let http_client = Client::builder().build().expect("an http client");
-    let request = http_client
-        .get(format!("http://127.0.0.1:{listening_port}/mock/{feature}"))
-        .build()
-        .unwrap();
-    let actual_count: u32 = http_client
-        .execute(request)
-        .await
-        .unwrap()
-        .text()
-        .await
-        .unwrap()
-        .as_str()
-        .parse()
-        .unwrap();
-    assert_eq!(actual_count, expected_count, "expecting {expected_count}");
-}
+impl RikaFirenetHost for ContainerAsync<GenericImage> {
+    async fn rika_firenet_base_url(&self) -> String {
+        let listening_port = self
+            .ports()
+            .await
+            .unwrap()
+            .map_to_host_port_ipv4(3000)
+            .unwrap();
+        format!("http://127.0.0.1:{listening_port}")
+    }
 
+    async fn assert_mock_count(&self, feature: &str, expected_count: u32) {
+        let base_url = self.rika_firenet_base_url().await;
+        let http_client = Client::builder().build().expect("an http client");
+        let request = http_client
+            .get(format!("{base_url}/mock/{feature}"))
+            .build()
+            .unwrap();
+        let actual_count: u32 = http_client
+            .execute(request)
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap()
+            .as_str()
+            .parse()
+            .unwrap();
+        assert_eq!(actual_count, expected_count, "expecting {expected_count}");
+    }
+}
 #[tokio::test]
 async fn should_sucessfully_auto_login() {
     let container = start_rika_mock().await;
-    let client = client_for(&container)
-        .await
-        .credentials("registered-user@rika-firenet.com", "Secret")
-        .build();
+    let client = RikaFirenetClient::builder()
+        .base_url(container.rika_firenet_base_url().await)
+        .build("registered-user@rika-firenet.com", "Secret");
 
     client.list_stoves().await.unwrap();
 }
@@ -73,10 +69,9 @@ async fn should_sucessfully_auto_login() {
 #[tokio::test]
 async fn can_list_stoves() {
     let container = start_rika_mock().await;
-    let client = client_for(&container)
-        .await
-        .credentials("registered-user@rika-firenet.com", "Secret")
-        .build();
+    let client = RikaFirenetClient::builder()
+        .base_url(container.rika_firenet_base_url().await)
+        .build("registered-user@rika-firenet.com", "Secret");
 
     let stoves = client.list_stoves().await.unwrap();
     assert_eq!(stoves, vec!["12345", "333444"], "expect 2 stoves ids");
@@ -85,10 +80,9 @@ async fn can_list_stoves() {
 #[tokio::test]
 async fn can_list_stoves_multiple_times_with_one_single_authentication() {
     let container = start_rika_mock().await;
-    let client = client_for(&container)
-        .await
-        .credentials("registered-user@rika-firenet.com", "Secret")
-        .build();
+    let client = RikaFirenetClient::builder()
+        .base_url(container.rika_firenet_base_url().await)
+        .build("registered-user@rika-firenet.com", "Secret");
 
     let stoves = client.list_stoves().await.unwrap();
     assert_eq!(stoves, vec!["12345", "333444"], "expect 2 stoves ids");
@@ -97,16 +91,15 @@ async fn can_list_stoves_multiple_times_with_one_single_authentication() {
     let stoves = client.list_stoves().await.unwrap();
     assert_eq!(stoves, vec!["12345", "333444"], "expect 2 stoves ids");
 
-    assert_mock_count("login-count", 1, &container).await;
+    container.assert_mock_count("login-count", 1).await;
 }
 
 #[tokio::test]
 async fn cant_list_stoves_with_invalid_credentials() {
     let container = start_rika_mock().await;
-    let client = client_for(&container)
-        .await
-        .credentials("unknown-user@rika-firenet.com", "InvalidSecret")
-        .build();
+    let client = RikaFirenetClient::builder()
+        .base_url(container.rika_firenet_base_url().await)
+        .build("unknown-user@rika-firenet.com", "InvalidSecret");
 
     let empty_response = client.list_stoves().await.unwrap();
     assert_eq!(empty_response.len(), 0, "expect empty stoves ids");
@@ -115,10 +108,9 @@ async fn cant_list_stoves_with_invalid_credentials() {
 #[tokio::test]
 async fn can_get_stove_status() {
     let container = start_rika_mock().await;
-    let client = client_for(&container)
-        .await
-        .credentials("registered-user@rika-firenet.com", "Secret")
-        .build();
+    let client = RikaFirenetClient::builder()
+        .base_url(container.rika_firenet_base_url().await)
+        .build("registered-user@rika-firenet.com", "Secret");
 
     let stove = client.status("12345").await.unwrap();
 
@@ -131,30 +123,28 @@ async fn can_get_stove_status() {
 #[tokio::test]
 async fn can_log_out() {
     let container = start_rika_mock().await;
-    assert_mock_count("logout-count", 0, &container).await;
+    container.assert_mock_count("logout-count", 0).await;
 
-    let client = client_for(&container)
-        .await
-        .credentials("registered-user@rika-firenet.com", "Secret")
-        .build();
+    let client = RikaFirenetClient::builder()
+        .base_url(container.rika_firenet_base_url().await)
+        .build("registered-user@rika-firenet.com", "Secret");
     client.list_stoves().await.unwrap();
     client.logout().await.unwrap();
 
-    assert_mock_count("logout-count", 1, &container).await;
+    container.assert_mock_count("logout-count", 1).await;
 
     client.list_stoves().await.unwrap();
     client.logout().await.unwrap();
 
-    assert_mock_count("logout-count", 2, &container).await;
+    container.assert_mock_count("logout-count", 2).await;
 }
 
 #[tokio::test]
 async fn can_turn_stove_off_and_on() {
     let container = start_rika_mock().await;
-    let client = client_for(&container)
-        .await
-        .credentials("registered-user@rika-firenet.com", "Secret")
-        .build();
+    let client = RikaFirenetClient::builder()
+        .base_url(container.rika_firenet_base_url().await)
+        .build("registered-user@rika-firenet.com", "Secret");
 
     let stove = client.status("12345").await.unwrap();
     assert_eq!(stove.controls.on_off, Some(true), "stove control is on");
@@ -190,16 +180,15 @@ async fn can_execute_sample_senario() {
     let container = start_rika_mock().await;
 
     let stove_id = "12345";
-    let client = client_for(&container)
-        .await
-        .credentials("registered-user@rika-firenet.com", "Secret")
-        .build();
+    let client = RikaFirenetClient::builder()
+        .base_url(container.rika_firenet_base_url().await)
+        .build("registered-user@rika-firenet.com", "Secret");
 
     // let stove_id = "12345";
     // let client = RikaFirenetClient::builder()
     //     .base_url("https://www.rika-firenet.com".to_string())
-    //     .credentials("registered-user@rika-firenet.com", "Secret")
-    //     .build();
+    //     .build("registered-user@rika-firenet.com", "Secret")
+    //    ;
 
     let original_status = client.status(stove_id).await.unwrap();
     println!("\nstove status:\n{original_status:?}");

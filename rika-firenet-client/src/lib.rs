@@ -1,27 +1,26 @@
 use std::sync::Arc;
 
+use crate::api_internals::OverrideResponseContentTypeHeader;
 use anyhow::{Result, ensure};
+use api_internals::RetryWithAuthMiddleware;
 use async_trait::async_trait;
-use auth::RetryWithAuthMiddleware;
-use header::CONTENT_TYPE;
-use http::{Extensions, HeaderValue, header};
+use bon::bon;
 use lazy_static::lazy_static;
 use log::debug;
 use model::{HeatingSchedule, OperatingMode, StatusDetail};
 use nipper::Document;
 use regex::Regex;
-use reqwest::{Client, Request, Response, redirect::Policy};
-use reqwest_middleware::{ClientBuilder, Middleware, Next};
+use reqwest::{Client, redirect::Policy};
+use reqwest_middleware::{ClientBuilder, Middleware};
 use rika_firenet_openapi::apis::auth_api::{AuthApi, AuthApiClient};
 use rika_firenet_openapi::apis::stoves_api::{StovesApi, StovesApiClient};
 use rika_firenet_openapi::apis::{
-    auth_api::LoginParams,
     configuration::Configuration,
     stoves_api::{StoveControlsParams, StoveStatusParams},
 };
 pub use rika_firenet_openapi::models::{StoveControls, StoveStatus};
 
-mod auth;
+mod api_internals;
 pub mod model;
 
 const API_BASE_URL: &str = "https://www.rika-firenet.com";
@@ -33,88 +32,116 @@ lazy_static! {
             Regex::new("(?P<firstStartHH>\\d{2})(?P<firstStartMM>\\d{2})(?P<firstEndHH>\\d{2})(?P<firstEndMM>\\d{2})(?P<secondStartHH>\\d{2})(?P<secondStartMM>\\d{2})(?P<secondndHH>\\d{2})(?P<secondEndMM>\\d{2})").unwrap();
 }
 
-#[derive(Default)]
-pub struct RikaFirenetClientBuilder {
-    base_url: Option<String>,
-    credentials: Option<LoginParams>,
-    reqwest_middleware: Option<Arc<dyn Middleware>>,
+#[async_trait]
+pub trait RikaFirenet {
+    async fn list_stoves(&self) -> Result<Vec<String>>;
+    async fn status<S: Into<String> + Send>(&self, stove_id: S) -> Result<StoveStatus>;
+    async fn restore_controls<S: Into<String> + Send>(
+        &self,
+        stove_id: S,
+        controls: StoveControls,
+    ) -> Result<()>;
+    async fn turn_on<S: Into<String> + Send>(&self, stove_id: S) -> Result<()>;
+
+    async fn turn_off<S: Into<String> + Send>(&self, stove_id: S) -> Result<()>;
+    async fn set_manual_mode<S: Into<String> + Send>(
+        &self,
+        stove_id: S,
+        heating_power_percent: u8,
+    ) -> Result<()>;
+    async fn set_auto_mode<S: Into<String> + Send>(
+        &self,
+        stove_id: S,
+        heating_power_percent: u8,
+    ) -> Result<()>;
+    async fn set_comfort_mode<S: Into<String> + Send>(
+        &self,
+        stove_id: S,
+        idle_temperature: u8,
+        target_temperature: u8,
+    ) -> Result<()>;
+    async fn enable_frost_protection<S: Into<String> + Send>(
+        &self,
+        stove_id: S,
+        frost_protection_temperature: u8,
+    ) -> Result<()>;
+    async fn disable_frost_protection<S: Into<String> + Send>(&self, stove_id: S) -> Result<()>;
+    async fn enable_schedule<S: Into<String> + Send>(
+        &self,
+        stove_id: S,
+        schedule: HeatingSchedule,
+    ) -> Result<()>;
+
+    async fn logout(&self) -> Result<()>;
 }
 
-impl RikaFirenetClientBuilder {
-    pub fn base_url<S: Into<String>>(mut self, base_url: S) -> Self {
-        self.base_url = Some(base_url.into().trim_end_matches('/').to_string());
-        self
-    }
+pub struct RikaFirenetClient {
+    auth_api: Arc<dyn AuthApi>,
+    stoves_api: Arc<dyn StovesApi>,
+}
 
-    pub fn credentials<S: Into<String>>(mut self, username: S, password: S) -> Self {
-        self.credentials = Some(LoginParams {
-            email: username.into(),
-            password: password.into(),
-        });
-        self
-    }
-
-    pub fn enable_metrics(mut self, reqwest_middleware: Arc<dyn Middleware>) -> Self {
-        self.reqwest_middleware = Some(reqwest_middleware);
-        self
-    }
-
-    pub fn build(self) -> RikaFirenetClient {
+#[bon]
+impl RikaFirenetClient {
+    #[builder(on(String, into))]
+    pub fn new(
+        #[builder(finish_fn)] email: String,
+        #[builder(finish_fn)] password: String,
+        base_url: Option<String>,
+        reqwest_middleware: Option<Arc<dyn Middleware>>,
+    ) -> Self {
         let inner_client = Client::builder()
             .cookie_store(true)
             .redirect(Policy::none())
             .build()
             .expect("an http client");
 
-        let api_configuration = Configuration {
-            base_path: self.base_url.unwrap_or(API_BASE_URL.to_string()),
+        let base_config = Configuration {
+            base_path: base_url
+                .unwrap_or_else(|| API_BASE_URL.to_string())
+                .trim_end_matches('/')
+                .to_string(),
             user_agent: Some(FIREFOX_USER_AGENT.to_string()),
             ..Default::default()
         };
 
-        let mut login_client = ClientBuilder::new(inner_client.clone());
-        if let Some(reqwest_middleware) = self.reqwest_middleware.as_ref() {
-            login_client = login_client.with_arc(reqwest_middleware.clone());
+        let mut auth_client = ClientBuilder::new(inner_client.clone());
+        if let Some(reqwest_middleware) = reqwest_middleware.as_ref() {
+            auth_client = auth_client.with_arc(reqwest_middleware.clone());
         }
-        let auth_api = Arc::new(AuthApiClient::new(Arc::new(Configuration {
-            client: login_client.build(),
-            ..api_configuration.clone()
-        })));
+        let auth_api = Arc::new(AuthApiClient::new(
+            Configuration {
+                client: auth_client.build(),
+                ..base_config.clone()
+            }
+            .into(),
+        ));
 
-        let login_middleware = RetryWithAuthMiddleware::new(
-            auth_api.clone(),
-            self.credentials
-                .expect("API can't be used without credentials"),
-        );
-
-        let mut api_client = ClientBuilder::new(inner_client)
-            .with(login_middleware)
-            .with(OverrideResponseContentTypeHeader {});
-        if let Some(prometheus_middleware) = self.reqwest_middleware.as_ref() {
-            api_client = api_client.with_arc(prometheus_middleware.clone());
+        let mut stoves_client = ClientBuilder::new(inner_client)
+            .with(OverrideResponseContentTypeHeader::new())
+            .with(
+                RetryWithAuthMiddleware::builder()
+                    .api(auth_api.clone())
+                    .build(email, password),
+            );
+        if let Some(prometheus_middleware) = reqwest_middleware {
+            stoves_client = stoves_client.with_arc(prometheus_middleware);
         }
-        RikaFirenetClient {
+        Self {
             auth_api,
-            stoves_api: Arc::new(StovesApiClient::new(Arc::new(Configuration {
-                client: api_client.build(),
-                ..api_configuration
-            }))),
+            stoves_api: Arc::new(StovesApiClient::new(
+                Configuration {
+                    client: stoves_client.build(),
+                    ..base_config
+                }
+                .into(),
+            )),
         }
     }
 }
 
-#[derive(Clone)]
-pub struct RikaFirenetClient {
-    auth_api: Arc<AuthApiClient>,
-    stoves_api: Arc<StovesApiClient>,
-}
-
-impl RikaFirenetClient {
-    pub fn builder() -> RikaFirenetClientBuilder {
-        RikaFirenetClientBuilder::default()
-    }
-
-    pub async fn list_stoves(&self) -> Result<Vec<String>> {
+#[async_trait]
+impl RikaFirenet for RikaFirenetClient {
+    async fn list_stoves(&self) -> Result<Vec<String>> {
         let stove_body: String = self.stoves_api.list_stoves().await?;
         debug!("List stoves result: {stove_body}");
         let stove_ids = extract_stove_ids(&stove_body);
@@ -122,7 +149,7 @@ impl RikaFirenetClient {
         Ok(stove_ids)
     }
 
-    pub async fn status<S: Into<String>>(&self, stove_id: S) -> Result<StoveStatus> {
+    async fn status<S: Into<String> + Send>(&self, stove_id: S) -> Result<StoveStatus> {
         Ok(self
             .stoves_api
             .stove_status(StoveStatusParams {
@@ -131,7 +158,7 @@ impl RikaFirenetClient {
             .await?)
     }
 
-    pub async fn restore_controls<S: Into<String>>(
+    async fn restore_controls<S: Into<String> + Send>(
         &self,
         stove_id: S,
         controls: StoveControls,
@@ -141,27 +168,27 @@ impl RikaFirenetClient {
             controls,
             ..current_status
         };
-        let params = into_controls(restore_status);
+        let params = restore_status.into_stove_controls();
         Ok(self.stoves_api.stove_controls(params).await?)
     }
 
-    pub async fn turn_on<S: Into<String>>(&self, stove_id: S) -> Result<()> {
+    async fn turn_on<S: Into<String> + Send>(&self, stove_id: S) -> Result<()> {
         let params = StoveControlsParams {
             on_off: Some(true),
-            ..self.current_controls(stove_id).await?
+            ..self.status(stove_id).await?.into_stove_controls()
         };
         Ok(self.stoves_api.stove_controls(params).await?)
     }
 
-    pub async fn turn_off<S: Into<String>>(&self, stove_id: S) -> Result<()> {
+    async fn turn_off<S: Into<String> + Send>(&self, stove_id: S) -> Result<()> {
         let params = StoveControlsParams {
             on_off: Some(false),
-            ..self.current_controls(stove_id).await?
+            ..self.status(stove_id).await?.into_stove_controls()
         };
         Ok(self.stoves_api.stove_controls(params).await?)
     }
 
-    pub async fn set_manual_mode<S: Into<String>>(
+    async fn set_manual_mode<S: Into<String> + Send>(
         &self,
         stove_id: S,
         heating_power_percent: u8,
@@ -173,12 +200,12 @@ impl RikaFirenetClient {
         let params = StoveControlsParams {
             operating_mode: Some(OperatingMode::Manual.into()),
             heating_power: Some(heating_power_percent.into()),
-            ..self.current_controls(stove_id).await?
+            ..self.status(stove_id).await?.into_stove_controls()
         };
         Ok(self.stoves_api.stove_controls(params).await?)
     }
 
-    pub async fn set_auto_mode<S: Into<String>>(
+    async fn set_auto_mode<S: Into<String> + Send>(
         &self,
         stove_id: S,
         heating_power_percent: u8,
@@ -190,12 +217,12 @@ impl RikaFirenetClient {
         let params = StoveControlsParams {
             operating_mode: Some(OperatingMode::Auto.into()),
             heating_power: Some(heating_power_percent.into()),
-            ..self.current_controls(stove_id).await?
+            ..self.status(stove_id).await?.into_stove_controls()
         };
         Ok(self.stoves_api.stove_controls(params).await?)
     }
 
-    pub async fn set_comfort_mode<S: Into<String>>(
+    async fn set_comfort_mode<S: Into<String> + Send>(
         &self,
         stove_id: S,
         idle_temperature: u8,
@@ -217,12 +244,12 @@ impl RikaFirenetClient {
             operating_mode: Some(OperatingMode::Comfort.into()),
             target_temperature: Some(target_temperature.to_string()),
             set_back_temperature: Some(idle_temperature.to_string()),
-            ..self.current_controls(stove_id).await?
+            ..self.status(stove_id).await?.into_stove_controls()
         };
         Ok(self.stoves_api.stove_controls(params).await?)
     }
 
-    pub async fn enable_frost_protection<S: Into<String>>(
+    async fn enable_frost_protection<S: Into<String> + Send>(
         &self,
         stove_id: S,
         frost_protection_temperature: u8,
@@ -234,20 +261,20 @@ impl RikaFirenetClient {
         let params = StoveControlsParams {
             frost_protection_active: Some(true),
             frost_protection_temperature: Some(frost_protection_temperature.to_string()),
-            ..self.current_controls(stove_id).await?
+            ..self.status(stove_id).await?.into_stove_controls()
         };
         Ok(self.stoves_api.stove_controls(params).await?)
     }
 
-    pub async fn disable_frost_protection<S: Into<String>>(&self, stove_id: S) -> Result<()> {
+    async fn disable_frost_protection<S: Into<String> + Send>(&self, stove_id: S) -> Result<()> {
         let params = StoveControlsParams {
             frost_protection_active: Some(false),
-            ..self.current_controls(stove_id).await?
+            ..self.status(stove_id).await?.into_stove_controls()
         };
         Ok(self.stoves_api.stove_controls(params).await?)
     }
 
-    pub async fn enable_schedule<S: Into<String>>(
+    async fn enable_schedule<S: Into<String> + Send>(
         &self,
         stove_id: S,
         schedule: HeatingSchedule,
@@ -268,18 +295,13 @@ impl RikaFirenetClient {
             heating_time_sat2: Some(schedule.saturday.second.into()),
             heating_time_sun1: Some(schedule.sunday.first.into()),
             heating_time_sun2: Some(schedule.sunday.second.into()),
-            ..self.current_controls(stove_id).await?
+            ..self.status(stove_id).await?.into_stove_controls()
         };
         println!("{params:?}");
         Ok(self.stoves_api.stove_controls(params).await?)
     }
 
-    async fn current_controls<S: Into<String>>(&self, stove_id: S) -> Result<StoveControlsParams> {
-        let status = self.status(stove_id).await?;
-        Ok(into_controls(status))
-    }
-
-    pub async fn logout(&self) -> Result<()> {
+    async fn logout(&self) -> Result<()> {
         Ok(self.auth_api.logout().await?)
     }
 }
@@ -298,47 +320,53 @@ fn extract_stove_ids(body: &str) -> Vec<String> {
         .collect()
 }
 
-fn into_controls(status: StoveStatus) -> StoveControlsParams {
-    StoveControlsParams {
-        stove_id: status.stove_id,
-        room_power_request: status.controls.room_power_request,
-        bake_temperature: status.controls.bake_temperature,
-        convection_fan1_active: status.controls.convection_fan1_active,
-        convection_fan1_area: status.controls.convection_fan1_area,
-        convection_fan1_level: status.controls.convection_fan1_level,
-        convection_fan2_active: status.controls.convection_fan2_active,
-        convection_fan2_area: status.controls.convection_fan2_area,
-        convection_fan2_level: status.controls.convection_fan2_level,
-        debug0: status.controls.debug0,
-        debug1: status.controls.debug1,
-        debug2: status.controls.debug2,
-        debug3: status.controls.debug3,
-        debug4: status.controls.debug4,
-        eco_mode: status.controls.eco_mode,
-        frost_protection_active: status.controls.frost_protection_active,
-        frost_protection_temperature: status.controls.frost_protection_temperature,
-        heating_power: status.controls.heating_power,
-        heating_time_fri1: status.controls.heating_time_fri1,
-        heating_time_fri2: status.controls.heating_time_fri2,
-        heating_time_mon1: status.controls.heating_time_mon1,
-        heating_time_mon2: status.controls.heating_time_mon2,
-        heating_time_sat1: status.controls.heating_time_sat1,
-        heating_time_sat2: status.controls.heating_time_sat2,
-        heating_time_sun1: status.controls.heating_time_sun1,
-        heating_time_sun2: status.controls.heating_time_sun2,
-        heating_time_thu1: status.controls.heating_time_thu1,
-        heating_time_thu2: status.controls.heating_time_thu2,
-        heating_time_tue1: status.controls.heating_time_tue1,
-        heating_time_tue2: status.controls.heating_time_tue2,
-        heating_time_wed1: status.controls.heating_time_wed1,
-        heating_time_wed2: status.controls.heating_time_wed2,
-        heating_times_active_for_comfort: status.controls.heating_times_active_for_comfort,
-        on_off: status.controls.on_off,
-        operating_mode: status.controls.operating_mode,
-        revision: Some(status.last_confirmed_revision),
-        set_back_temperature: status.controls.set_back_temperature,
-        target_temperature: status.controls.target_temperature,
-        temperature_offset: status.controls.temperature_offset,
+trait IntoStoveControlsParams {
+    fn into_stove_controls(self) -> StoveControlsParams;
+}
+
+impl IntoStoveControlsParams for StoveStatus {
+    fn into_stove_controls(self) -> StoveControlsParams {
+        StoveControlsParams {
+            stove_id: self.stove_id,
+            room_power_request: self.controls.room_power_request,
+            bake_temperature: self.controls.bake_temperature,
+            convection_fan1_active: self.controls.convection_fan1_active,
+            convection_fan1_area: self.controls.convection_fan1_area,
+            convection_fan1_level: self.controls.convection_fan1_level,
+            convection_fan2_active: self.controls.convection_fan2_active,
+            convection_fan2_area: self.controls.convection_fan2_area,
+            convection_fan2_level: self.controls.convection_fan2_level,
+            debug0: self.controls.debug0,
+            debug1: self.controls.debug1,
+            debug2: self.controls.debug2,
+            debug3: self.controls.debug3,
+            debug4: self.controls.debug4,
+            eco_mode: self.controls.eco_mode,
+            frost_protection_active: self.controls.frost_protection_active,
+            frost_protection_temperature: self.controls.frost_protection_temperature,
+            heating_power: self.controls.heating_power,
+            heating_time_fri1: self.controls.heating_time_fri1,
+            heating_time_fri2: self.controls.heating_time_fri2,
+            heating_time_mon1: self.controls.heating_time_mon1,
+            heating_time_mon2: self.controls.heating_time_mon2,
+            heating_time_sat1: self.controls.heating_time_sat1,
+            heating_time_sat2: self.controls.heating_time_sat2,
+            heating_time_sun1: self.controls.heating_time_sun1,
+            heating_time_sun2: self.controls.heating_time_sun2,
+            heating_time_thu1: self.controls.heating_time_thu1,
+            heating_time_thu2: self.controls.heating_time_thu2,
+            heating_time_tue1: self.controls.heating_time_tue1,
+            heating_time_tue2: self.controls.heating_time_tue2,
+            heating_time_wed1: self.controls.heating_time_wed1,
+            heating_time_wed2: self.controls.heating_time_wed2,
+            heating_times_active_for_comfort: self.controls.heating_times_active_for_comfort,
+            on_off: self.controls.on_off,
+            operating_mode: self.controls.operating_mode,
+            revision: Some(self.last_confirmed_revision),
+            set_back_temperature: self.controls.set_back_temperature,
+            target_temperature: self.controls.target_temperature,
+            temperature_offset: self.controls.temperature_offset,
+        }
     }
 }
 
@@ -460,47 +488,10 @@ impl HasDetailledStatus for StoveStatus {
     }
 }
 
-struct OverrideResponseContentTypeHeader {}
-
-#[async_trait]
-impl Middleware for OverrideResponseContentTypeHeader {
-    async fn handle(
-        &self,
-        request: Request,
-        extensions: &mut Extensions,
-        next: Next<'_>,
-    ) -> reqwest_middleware::Result<Response> {
-        let mut response = next
-            .clone()
-            .run(
-                request
-                    .try_clone()
-                    .expect("request shouldn't have a stream body"),
-                extensions,
-            )
-            .await?;
-        let headers = response.headers_mut();
-        let content_type = headers
-            .get(CONTENT_TYPE)
-            .and_then(|value| value.to_str().ok());
-        match content_type {
-            Some(content_type) => {
-                if !content_type.starts_with("application") || !content_type.contains("json") {
-                    headers.insert(CONTENT_TYPE, HeaderValue::from_static("text/plain"));
-                }
-            }
-            None => {
-                headers.insert(CONTENT_TYPE, HeaderValue::from_static("text/plain"));
-            }
-        }
-        return Ok(response);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{
-        HasDetailledStatus, RikaFirenetClient, extract_stove_ids,
+        HasDetailledStatus, RikaFirenet, RikaFirenetClient, extract_stove_ids,
         model::{DailySchedule, HeatingSchedule, StatusDetail},
     };
     use httpmock::{
@@ -545,8 +536,7 @@ mod tests {
 
         let client = RikaFirenetClient::builder()
             .base_url(server.base_url())
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         let stoves = client.list_stoves().await.expect("a successful operation");
 
@@ -566,8 +556,7 @@ mod tests {
 
         let client = RikaFirenetClient::builder()
             .base_url(server.base_url())
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         let status = client
             .status("12345")
@@ -595,8 +584,7 @@ mod tests {
 
         let client = RikaFirenetClient::builder()
             .base_url(server.base_url())
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         let status = client
             .status("12345")
@@ -630,8 +618,7 @@ mod tests {
 
         let client = RikaFirenetClient::builder()
             .base_url(server.base_url())
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         client
             .turn_on("__stove_id__")
@@ -661,8 +648,7 @@ mod tests {
 
         let client = RikaFirenetClient::builder()
             .base_url(server.base_url())
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         client
             .turn_off("__stove_id__")
@@ -693,8 +679,7 @@ mod tests {
 
         let client = RikaFirenetClient::builder()
             .base_url(server.base_url())
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         client
             .set_manual_mode("__stove_id__", 51)
@@ -709,8 +694,7 @@ mod tests {
     async fn cant_set_stove_mode_to_manual_with_an_invalid_power_heating_value() {
         let client = RikaFirenetClient::builder()
             .base_url("http://localhost")
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         let error = client
             .set_manual_mode("__stove_id__", 101)
@@ -743,8 +727,7 @@ mod tests {
 
         let client = RikaFirenetClient::builder()
             .base_url(server.base_url())
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         client
             .set_auto_mode("__stove_id__", 52)
@@ -759,8 +742,7 @@ mod tests {
     async fn cant_set_stove_mode_to_auto_with_an_invalid_power_heating_value() {
         let client = RikaFirenetClient::builder()
             .base_url("http://localhost")
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         let error = client.set_auto_mode("__stove_id__", 101).await.unwrap_err();
         let root_cause = error.root_cause();
@@ -791,8 +773,7 @@ mod tests {
 
         let client = RikaFirenetClient::builder()
             .base_url(server.base_url())
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         client
             .set_comfort_mode("__stove_id__", 17, 19)
@@ -807,8 +788,7 @@ mod tests {
     async fn cant_set_stove_mode_to_comfort_with_an_invalid_target_or_idle_temperature_value() {
         let client = RikaFirenetClient::builder()
             .base_url("http://localhost")
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         let error = client
             .set_comfort_mode("__stove_id__", 12, 13)
@@ -892,8 +872,7 @@ mod tests {
 
         let client = RikaFirenetClient::builder()
             .base_url(server.base_url())
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         let schedule = HeatingSchedule::week_vs_end_days(
             DailySchedule::dual("06300900".parse().unwrap(), "18152245".parse().unwrap()),
@@ -928,8 +907,7 @@ mod tests {
 
         let client = RikaFirenetClient::builder()
             .base_url(server.base_url())
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         client
             .enable_frost_protection("__stove_id__", 8)
@@ -944,8 +922,7 @@ mod tests {
     async fn cant_enable_frost_protection_with_an_invalid_temperature_value() {
         let client = RikaFirenetClient::builder()
             .base_url("http://localhost")
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         let error = client
             .enable_frost_protection("__stove_id__", 3)
@@ -987,8 +964,7 @@ mod tests {
 
         let client = RikaFirenetClient::builder()
             .base_url(server.base_url())
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         client
             .disable_frost_protection("__stove_id__")
@@ -1012,8 +988,7 @@ mod tests {
 
         let client = RikaFirenetClient::builder()
             .base_url(server.base_url())
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         client.logout().await.expect("a successful operation");
 
@@ -1030,8 +1005,7 @@ mod tests {
 
         let client = RikaFirenetClient::builder()
             .base_url(format!("{}///", server.base_url()))
-            .credentials("someone@rika.com", "Secret!")
-            .build();
+            .build("someone@rika.com", "Secret!");
 
         client
             .logout()
