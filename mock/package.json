@@ -3,7 +3,7 @@
     "start": "cd src && node server.js"
   },
   "dependencies": {
-    "body-parser": "^1.20.2",
+    "body-parser": "^2.0.0",
     "express": "^5.0.0",
     "express-session": "^1.17.3"
   }
