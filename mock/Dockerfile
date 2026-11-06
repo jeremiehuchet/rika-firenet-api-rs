@@ -1,4 +1,4 @@
-FROM node:22@sha256:e273cf2a19c7334c03f52e2ca933ecdfc3fbfaad49db7b8bc8c3edd9ac34e9c7
+FROM node:22@sha256:7702d8aa4d5910871692af4480eb3ba86f23047a6417a44d857d06c95d060d3f
 WORKDIR /mock
 COPY package*.json ./
 RUN npm ci --omit=dev
